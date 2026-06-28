@@ -302,4 +302,31 @@ export interface SnippetFilters {
   tag: string
 }
 
+export interface StudyLesson {
+  id: number
+  moduleId: number
+  title: string
+  kind: 'training' | 'lesson' | 'task' | 'quiz' | 'test' | 'project'
+  content: string
+  homeworkPrompt?: string
+  orderIndex: number
+}
+
+export interface StudyModule {
+  id: number
+  courseId: number
+  title: string
+  description?: string
+  orderIndex: number
+  lessons: StudyLesson[]
+}
+
+export interface StudyCourse {
+  id: number
+  title: string
+  description: string
+  code: string
+  orderIndex: number
+}
+
 

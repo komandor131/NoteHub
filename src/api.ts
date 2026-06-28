@@ -20,6 +20,9 @@ import type {
   MindMapPayload,
   Roadmap,
   RoadmapPayload,
+  StudyCourse,
+  StudyModule,
+  StudyLesson,
 } from './types'
 
 const jsonHeaders = {
@@ -341,3 +344,37 @@ export async function updateRoadmap(id: number, payload: RoadmapPayload) {
 export async function deleteRoadmap(id: number) {
   await request<void>(`/api/roadmaps/${id}`, { method: 'DELETE' })
 }
+
+// --- Study API ---
+export async function fetchCourses() {
+  return request<StudyCourse[]>('/api/study/courses')
+}
+
+export async function createCourse(payload: { title: string; description: string; code: string }) {
+  return request<StudyCourse>('/api/study/courses', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload)
+  })
+}
+
+export async function fetchCourseModules(courseId: number) {
+  return request<StudyModule[]>(`/api/study/courses/${courseId}/modules`)
+}
+
+export async function createModule(courseId: number, payload: { title: string; description?: string }) {
+  return request<StudyModule>(`/api/study/courses/${courseId}/modules`, {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload)
+  })
+}
+
+export async function createLesson(moduleId: number, payload: { title: string; kind?: string; content?: string; homeworkPrompt?: string }) {
+  return request<StudyLesson>(`/api/study/modules/${moduleId}/lessons`, {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload)
+  })
+}
+

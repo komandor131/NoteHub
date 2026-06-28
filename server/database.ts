@@ -884,6 +884,22 @@ function migrate() {
   ]) {
     addColumnIfMissing(table, 'ownerId', 'INTEGER')
   }
+
+  run(`
+    CREATE TABLE IF NOT EXISTS study_courses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      code TEXT NOT NULL DEFAULT '',
+      orderIndex INTEGER NOT NULL DEFAULT 0
+    );
+  `)
+
+  try {
+    run(`ALTER TABLE study_modules ADD COLUMN courseId INTEGER;`)
+  } catch (e) {
+    // Ignore error if column already exists
+  }
 }
 
 function seedDefaultUsers() {
@@ -3704,60 +3720,448 @@ function mapUser(row: Row): UserRecord {
 }
 
 function seedStudyContent() {
-  const existingModules = db!.prepare('SELECT COUNT(*) as count FROM study_modules').getAsObject() as { count: number }
-  if (existingModules.count > 0) return
-
-  console.log('Seeding NoteHub Study content...')
+  console.log('Seeding NoteHub Study content (Python Developer only)...')
   
-  const insertModule = db!.prepare('INSERT INTO study_modules (title, orderIndex) VALUES (?, ?)')
-  const insertLesson = db!.prepare('INSERT INTO study_lessons (moduleId, title, kind, content, orderIndex) VALUES (?, ?, ?, ?, ?)')
-  
-  const modules = [
-    'Модуль 1. Основи HTML',
-    'Модуль 2. Вступ до CSS',
-    'Модуль 3. Блокова модель. Flexbox',
-    'Модуль 4. Декоративні ефекти',
-    'Модуль 5. Елементи форм. Доступність',
-    'Модуль 6. Адаптивний дизайн'
-  ]
+  // Clean all study tables to prevent duplicates
+  run('DELETE FROM study_lessons')
+  run('DELETE FROM study_modules')
+  run('DELETE FROM study_courses')
 
-  let moduleId = 1
-  for (const [index, modTitle] of modules.entries()) {
-    insertModule.run([modTitle, index])
-    
-    // Add default lessons to each module
-    if (index === 5) { // Модуль 6
-      const lessons = [
-        { title: 'Програма модуля', type: 'training', content: 'Цього тижня ми маємо вивчити принципи адаптивного дизайну веб-сторінок. Ця навичка дозволить тобі створювати більш зручні для користувачів сторінки.' },
-        { title: 'Респонсивні сторінки', type: 'training', content: 'Респонсивний дизайн робить вашу сторінку зручною на будь-якому пристрої.' },
-        { title: 'Медіазапити', type: 'training', content: 'Медіазапити (@media) дозволяють застосовувати стилі залежно від розміру екрану.' },
-        { title: 'Логічні оператори', type: 'training', content: 'Використання and, or, not у медіазапитах.' },
-        { title: 'Підхід «Mobile First»', type: 'training', content: 'Спочатку стилізуйте для мобільних, а потім розширюйте для десктопів.' },
-        { title: 'Адаптивна графіка', type: 'training', content: 'Зображення та відео також повинні адаптуватися під екран.' },
-        { title: 'Lesson', type: 'lesson', content: 'Відео-лекція модуля 6.' },
-        { title: 'Task', type: 'task', content: 'Домашнє завдання: Створити респонсивний макет за допомогою Grid та Flexbox.' }
-      ]
-      
-      lessons.forEach((l, i) => {
-        insertLesson.run([moduleId, l.title, l.type, l.content, i])
-      })
-    } else {
-      insertLesson.run([moduleId, 'Програма модуля', 'training', 'Вступний матеріал', 0])
-      insertLesson.run([moduleId, 'Task', 'task', 'Практичне завдання', 1])
+  // Seed Course 1: Python Developer
+  run("INSERT INTO study_courses (id, title, description, code, orderIndex) VALUES (?, ?, ?, ?, ?)", [
+    1,
+    'Python Developer',
+    "Опануйте мову програмування Python з нуля: від перших змінних до об'єктно-орієнтованого програмування, декораторів та регулярних виразів.",
+    'python',
+    0
+  ]);
+
+  const insertModule = db!.prepare('INSERT INTO study_modules (id, courseId, title, orderIndex) VALUES (?, ?, ?, ?)')
+  const insertLesson = db!.prepare('INSERT INTO study_lessons (id, moduleId, title, kind, content, orderIndex) VALUES (?, ?, ?, ?, ?, ?)')
+
+  const modulesData = [
+    {
+      title: "Модуль 1. Вступ до Python та налаштування",
+      lessons: [
+        "1.1 Що таке програмування та мови розробки",
+        "1.2 Чому варто обрати Python",
+        "1.3 Встановлення інтерпретатора Python",
+        "1.4 Робота з інтерактивним REPL",
+        "1.5 Що таке середовище розробки IDE",
+        "1.6 Встановлення та налаштування VS Code",
+        "1.7 Встановлення плагінів для розробки",
+        "1.8 Створення першого файлу main.py",
+        "1.9 Запуск коду та перші кроки в терміналі"
+      ],
+      taskPrompt: "Напишіть програму, яка виводить привітання за допомогою функції print(): <code>print(\"Hello, NoteHub Study!\")</code>."
+    },
+    {
+      title: "Модуль 2. Змінні та базові поняття",
+      lessons: [
+        "2.1 Що таке пам'ять комп'ютера та змінні",
+        "2.2 Як оголошувати змінні в Python",
+        "2.3 Стандарт PEP 8 щодо іменування змінних",
+        "2.4 Поняття динамічної типізації",
+        "2.5 Перевизначення та перезапис змінних",
+        "2.6 Видалення змінних за допомогою del",
+        "2.7 Отримання типу змінної через type()",
+        "2.8 Коментування коду: однорядкові та багаторядкові"
+      ],
+      taskPrompt: "Оголосіть змінні з даними про користувача (ім'я та вік) та виведіть їх за допомогою print."
+    },
+    {
+      title: "Модуль 3. Числові типи даних",
+      lessons: [
+        "3.1 Цілі числа (int): основи та розмір",
+        "3.2 Дійсні числа (float) та їх представлення",
+        "3.3 Системи числення: двійкова, вісімкова, шістнадцяткова",
+        "3.4 Перетворення типів через int() та float()",
+        "3.5 Введення даних з консолі: функція input()",
+        "3.6 Приведення рядків до числових типів",
+        "3.7 Округлення чисел за допомогою round()",
+        "3.8 Корисні вбудовані математичні функції"
+      ],
+      taskPrompt: "Напишіть програму для розрахунку площі прямокутника зі сторонами a = 5 та b = 8 та виведіть її."
+    },
+    {
+      title: "Модуль 4. Арифметичні операції",
+      lessons: [
+        "4.1 Додавання (+) та віднімання (-)",
+        "4.2 Множення (*) та ділення (/)",
+        "4.3 Цілочисельне ділення (//)",
+        "4.4 Остача від ділення (%)",
+        "4.5 Піднесення до степеня (**)",
+        "4.6 Скорочені оператори присвоєння (+=, -=)",
+        "4.7 Скорочені оператори (*=, /=)",
+        "4.8 Пріоритет та черговість виконання операцій"
+      ],
+      taskPrompt: "Виведіть остачу від ділення 17 на 5 за допомогою оператора %."
+    },
+    {
+      title: "Модуль 5. Робота з рядками (str)",
+      lessons: [
+        "5.1 Рядки в Python та способи їх створення",
+        "5.2 Одинарні та подвійні лапки: різниця",
+        "5.3 Багаторядкові блоки тексту (потрійні лапки)",
+        "5.4 Спеціальні керівні символи (\\n, \\t)",
+        "5.5 Екранування лапок та спецсимволів",
+        "5.6 Сирі рядки (raw strings) з префіксом r",
+        "5.7 Визначення довжини рядка через len()"
+      ],
+      taskPrompt: "Створіть багаторядковий текст та виведіть його довжину за допомогою функції len()."
+    },
+    {
+      title: "Модуль 6. Операції над рядками",
+      lessons: [
+        "6.1 Додавання рядків (конкатенація)",
+        "6.2 Множення рядка на число (дублювання)",
+        "6.3 Індексація рядків та доступ до символів",
+        "6.4 Від'ємні індекси та пошук з кінця",
+        "6.5 Основи зрізів: start та end",
+        "6.6 Крок у зрізах (step)",
+        "6.7 Розвертання рядка за допомогою зрізу [::-1]"
+      ],
+      taskPrompt: "Отримайте зріз рядка 'NoteHub' з другого по п'ятий символ (індекси 1-4) та виведіть."
+    },
+    {
+      title: "Модуль 7. Методи рядків",
+      lessons: [
+        "7.1 Зміна регістру: upper() та lower()",
+        "7.2 Форматування регістру: capitalize() та title()",
+        "7.3 Пошук підрядка: find() та rfind()",
+        "7.4 Заміна тексту через replace()",
+        "7.5 Підрахунок входжень: count()",
+        "7.6 Перевірки: isdigit(), isalpha(), isalnum()",
+        "7.7 Очищення пробілів: strip(), lstrip(), rstrip()",
+        "7.8 Розбиття та об'єднання: split() та join()"
+      ],
+      taskPrompt: "Створіть рядок з пробілами на початку та в кінці, очистіть його через .strip() та приведіть до верхнього регістру."
+    },
+    {
+      title: "Модуль 8. Форматування рядків",
+      lessons: [
+        "8.1 Форматування рядків у стилі Си через %",
+        "8.2 Метод .format(): базове використання",
+        "8.3 Іменовані плейсхолдери в .format()",
+        "8.4 f-рядки (f-strings) та їх переваги",
+        "8.5 Математичні вирази всередині f-рядків",
+        "8.6 Виклик методів та функцій у f-рядках",
+        "8.7 Форматування дійсних чисел (кількість знаків)"
+      ],
+      taskPrompt: "Виведіть текст привітання за допомогою f-рядка з двома змінними (name та age)."
+    },
+    {
+      title: "Модуль 9. Логічний тип (bool) та оператори порівняння",
+      lessons: [
+        "9.1 Логічний тип даних (Boolean)",
+        "9.2 Константи True та False",
+        "9.3 Оператори порівняння: == та !=",
+        "9.4 Порівняння величин: <, >, <=, >=",
+        "9.5 Порівняння рядків (лексикографічний порядок)",
+        "9.6 Приведення типів до Boolean за допомогою bool()",
+        "9.7 Поняття Truthy та Falsy значень"
+      ],
+      taskPrompt: "Порівняйте два числа та виведіть результат логічного типу (наприклад, 10 > 5)."
+    },
+    {
+      title: "Модуль 10. Логічні оператори (and, or, not)",
+      lessons: [
+        "10.1 Логічний оператор AND (таблиця істинності)",
+        "10.2 Логічний оператор OR (таблиця істинності)",
+        "10.3 Логічне заперечення NOT",
+        "10.4 Пріоритет виконання логічних операцій",
+        "10.5 Комбінування кількох логічних операторів",
+        "10.6 Оптимізація обчислень (Short-circuiting)",
+        "10.7 Застосування логіки в реальних завданнях"
+      ],
+      taskPrompt: "Напишіть логічний вираз, який перевіряє, чи знаходиться число x = 15 в діапазоні від 10 до 20 включно."
+    },
+    {
+      title: "Модуль 11. Умовний оператор if",
+      lessons: [
+        "11.1 Що таке розгалуження в програмах",
+        "11.2 Базовий оператор if та синтаксис відступів",
+        "11.3 Конструкція if-else",
+        "11.4 Багатоальтернативне розгалуження: elif",
+        "11.5 Вкладені умовні оператори",
+        "11.6 Тернарний оператор (умовне присвоєння)",
+        "11.7 Використання оператора pass"
+      ],
+      taskPrompt: "Створіть умову, яка перевіряє, чи є число x = -3 додатнім, від'ємним або нулем, та виводить результат."
+    },
+    {
+      title: "Модуль 12. Цикл while",
+      lessons: [
+        "12.1 Концепція повторення дій (цикли)",
+        "12.2 Синтаксис та принцип роботи while",
+        "12.3 Зміна умови всередині циклу",
+        "12.4 Проблема нескінченних циклів",
+        "12.5 Оператор break для виходу з циклу",
+        "12.6 Оператор continue для пропуску ітерації",
+        "12.7 Конструкція while-else"
+      ],
+      taskPrompt: "Використовуючи цикл while, виведіть числа від 3 до 1 в зворотному порядку."
+    },
+    {
+      title: "Модуль 13. Цикл for та range()",
+      lessons: [
+        "13.1 Ітеровані об'єкти та цикл for",
+        "13.2 Функція range(): робота з 1 аргументом",
+        "13.3 range() з початком та кінцем (2 аргументи)",
+        "13.4 range() з кроком (3 аргументи)",
+        "13.5 Обхід рядків посимвольно",
+        "13.6 Використання break та continue в циклі for",
+        "13.7 Конструкція for-else",
+        "13.8 Вкладені цикли та матриці"
+      ],
+      taskPrompt: "Напишіть цикл for, який виводить квадрати чисел від 1 до 3."
+    },
+    {
+      title: "Модуль 14. Списки (Lists) — Створення та індексація",
+      lessons: [
+        "14.1 Що таке масиви та списки",
+        "14.2 Створення списків: квадратні дужки та list()",
+        "14.3 Зміна значень за індексами",
+        "14.4 Робота з негативними індексами",
+        "14.5 Зрізи списків: базовий синтаксис",
+        "14.6 Зрізи списків з кроком та реверс",
+        "14.7 Довжина списку за допомогою len()"
+      ],
+      taskPrompt: "Створіть список items = [10, 20, 30] та виведіть його останній елемент за допомогою негативного індексу -1."
+    },
+    {
+      title: "Модуль 15. Списки — Базові методи",
+      lessons: [
+        "15.1 Додавання елементів: append() та insert()",
+        "15.2 Об'єднання списків через extend() та +",
+        "15.3 Видалення елементів: remove() та clear()",
+        "15.4 Вилучення за індексом через pop()",
+        "15.5 Пошук індексу елемента: index()",
+        "15.6 Підрахунок кількості елементів: count()",
+        "15.7 Перевірка членства через оператор in",
+        "15.8 Математичні функції: sum(), min(), max()"
+      ],
+      taskPrompt: "Створіть список чисел L = [1, 2], додайте в кінець число 3 та знайдіть суму всіх елементів."
+    },
+    {
+      title: "Модуль 16. Списки — Сортування та генератори",
+      lessons: [
+        "16.1 Сортування списку на місці: метод sort()",
+        "16.2 Створення відсортованої копії: sorted()",
+        "16.3 Зміна черговості: метод reverse()",
+        "16.4 Проблема копіювання списків (посилання)",
+        "16.5 Поверхневе та глибоке копіювання: copy()",
+        "16.6 Вступ до List Comprehensions",
+        "16.7 Генерація списків з фільтрацією (if)"
+      ],
+      taskPrompt: "За допомогою List Comprehension створіть список парних чисел від 2 до 8."
+    },
+    {
+      title: "Модуль 17. Кортежі (Tuples)",
+      lessons: [
+        "17.1 Що таке кортежі та навіщо вони потрібні",
+        "17.2 Створення кортежів: дужки та tuple()",
+        "17.3 Створення кортежу з одного елемента",
+        "17.4 Незмінність (immutability) кортежів",
+        "17.5 Переваги у продуктивності та безпеці",
+        "17.6 Базові методи кортежів: count() та index()",
+        "17.7 Розпакування кортежів (unpacking)",
+        "17.8 Оператор зірочки * при розпакуванні"
+      ],
+      taskPrompt: "Створіть кортеж t = (1, 2, 3) та розпакуйте його в три окремі змінні a, b, c."
+    },
+    {
+      title: "Модуль 18. Словники (Dictionaries) — Основи",
+      lessons: [
+        "18.1 Асоціативні масиви (словники)",
+        "18.2 Створення словників: фігурні дужки та dict()",
+        "18.3 Обмеження на ключі словника (хешованість)",
+        "18.4 Доступ до елементів за ключем",
+        "18.5 Обробка помилки KeyError",
+        "18.6 Додавання нових пар ключ-значення",
+        "18.7 Зміна існуючих значень"
+      ],
+      taskPrompt: "Створіть словник d = {'title': 'NoteHub'} та виведіть його значення за ключем 'title'."
+    },
+    {
+      title: "Модуль 19. Словники — Робота з даними",
+      lessons: [
+        "19.1 Безпечний доступ через метод get()",
+        "19.2 Видалення елементів: pop() та popitem()",
+        "19.3 Отримання всіх ключів через keys()",
+        "19.4 Отримання всіх значень через values()",
+        "19.5 Робота з парами через items()",
+        "19.6 Оновлення словника методом update()",
+        "19.7 Вкладені словники (nested dictionaries)"
+      ],
+      taskPrompt: "Отримайте значення ключа 'status' за допомогою d.get('status', 'not_found') для порожнього словника."
+    },
+    {
+      title: "Модуль 20. Множини (Sets)",
+      lessons: [
+        "20.1 Що таке множини та їх характеристики",
+        "20.2 Створення множин: фігурні дужки та set()",
+        "20.3 Додавання елементів: метод add()",
+        "20.4 Видалення елементів: remove() та discard()",
+        "20.5 Об'єднання множин (union)",
+        "20.6 Перетин множин (intersection)",
+        "20.7 Різниця та симетрична різниця множин",
+        "20.8 Видалення дублікатів зі списків через set"
+      ],
+      taskPrompt: "Очистіть список [1, 2, 2, 3] від дублікатів за допомогою перетворення у множину set() та виведіть її."
+    },
+    {
+      title: "Модуль 21. Функції — Оголошення та аргументи",
+      lessons: [
+        "21.1 Концепція повторного використання коду",
+        "21.2 Оголошення функції за допомогою def",
+        "21.3 Повернення результату за допомогою return",
+        "21.4 Відмінність return від print",
+        "21.5 Параметри та фактичні аргументи",
+        "21.6 Обов'язкові та іменовані аргументи",
+        "21.7 Аргументи за замовчуванням (default values)"
+      ],
+      taskPrompt: "Напишіть функцію greet(name='Студент'), яка повертає рядок привітання, та виведіть результат."
+    },
+    {
+      title: "Модуль 22. Функції — Аргументи та Scope",
+      lessons: [
+        "22.1 Передача довільної кількості позиційних аргументів (*args)",
+        "22.2 Передача довільної кількості іменованих аргументів (**kwargs)",
+        "22.3 Локальні та глобальні змінні",
+        "22.4 Використання ключового слова global",
+        "22.5 Поняття вкладених функцій",
+        "22.6 Ключове слово nonlocal",
+        "22.7 Документування функцій (docstrings)"
+      ],
+      taskPrompt: "Напишіть функцію, яка сумує довільну кількість переданих аргументів за допомогою *args."
+    },
+    {
+      title: "Модуль 23. Обробка помилок (Try-Except)",
+      lessons: [
+        "23.1 Що таке помилки та виняткові ситуації",
+        "23.2 Синтаксичні помилки проти Exceptions",
+        "23.3 Конструкція try-except для перехоплення помилок",
+        "23.4 Перехоплення конкретних типів помилок",
+        "23.5 Використання блоку else",
+        "23.6 Використання блоку finally для закриття ресурсів",
+        "23.7 Генерація власних винятків через raise"
+      ],
+      taskPrompt: "Напишіть блок try-except для обробки помилки ZeroDivisionError при діленні 1 / 0."
+    },
+    {
+      title: "Модуль 24. ООП — Класи та об'єкти",
+      lessons: [
+        "24.1 Концепція об'єктно-орієнтованого програмування",
+        "24.2 Оголошення класу та створення об'єкта",
+        "24.3 Конструктор класу __init__",
+        "24.4 Що таке параметр self",
+        "24.5 Атрибути об'єкта та атрибути класу",
+        "24.6 Створення методів об'єкта",
+        "24.7 Рядкове представлення об'єкта: метод __str__"
+      ],
+      taskPrompt: "Створіть клас Car з атрибутом моделі та методом, що виводить назву моделі."
+    },
+    {
+      title: "Модуль 25. Робота з файлами",
+      lessons: [
+        "25.1 Відкриття файлів за допомогою open()",
+        "25.2 Режими роботи з файлами: r, w, a",
+        "25.3 Менеджер контексту with...as",
+        "25.4 Читання файлу: read(), readline(), readlines()",
+        "25.5 Запис даних у файл: write() та writelines()",
+        "25.6 Робота з файлами JSON: json.dumps() та json.loads()",
+        "25.7 Збереження та завантаження структурованих даних"
+      ],
+      taskPrompt: "Напишіть симуляцію збереження словника в JSON-рядок та виведіть його через print."
     }
-    moduleId++
+  ];
+
+  let globalLessonId = 1
+  for (const [mIdx, m] of modulesData.entries()) {
+    const moduleId = mIdx + 1
+    insertModule.run([moduleId, 1, m.title, mIdx])
+    
+    // Seed lessons/trainings
+    let orderIndex = 0
+    for (const lessonTitle of m.lessons) {
+      const lessonContent = "<h2>" + lessonTitle + "</h2><p>У цьому розділі ми детально розберемо тему \"<strong>" + lessonTitle + "</strong>\".</p><p>Вивчіть синтаксичні конструкції та запустіть відповідний код у редакторі праворуч.</p>"
+      insertLesson.run([globalLessonId++, moduleId, lessonTitle, 'training', lessonContent, orderIndex++])
+    }
+    
+    // Seed Task (Homework) at the end of the module
+    const taskContent = "<h2>Домашнє завдання: " + m.title + "</h2><p>Будь ласка, виконайте наступне практичне завдання:</p><p>" + m.taskPrompt + "</p>"
+    insertLesson.run([globalLessonId++, moduleId, 'Task', 'task', taskContent, orderIndex++])
   }
 }
 
+export function getCourses() {
+  return all('SELECT * FROM study_courses ORDER BY orderIndex ASC', {}, (row) => row)
+}
 
-export function getStudyModules() {
-  const modules = all('SELECT * FROM study_modules ORDER BY orderIndex ASC', {}, (row) => row)
+export function createCourse(input: { title: string; description: string; code: string }) {
+  const title = requiredText(input.title, 'Title is required')
+  const description = input.description || ''
+  const code = input.code || ''
+  
+  const maxOrder = db!.prepare('SELECT MAX(orderIndex) as maxIdx FROM study_courses').getAsObject() as { maxIdx: number | null }
+  const nextOrder = (maxOrder.maxIdx ?? -1) + 1
+  
+  run(
+    'INSERT INTO study_courses (title, description, code, orderIndex) VALUES (?, ?, ?, ?)',
+    [title, description, code, nextOrder]
+  )
+  
+  const id = db!.prepare('SELECT last_insert_rowid() as id').getAsObject().id as number
+  return { id, title, description, code, orderIndex: nextOrder }
+}
+
+export function getCourseModules(courseId: number) {
+  const modules = all('SELECT * FROM study_modules WHERE courseId = ? ORDER BY orderIndex ASC', [courseId], (row) => row)
   const lessons = all('SELECT * FROM study_lessons ORDER BY orderIndex ASC', {}, (row) => row)
   
   return modules.map((m: any) => ({
     ...m,
     lessons: lessons.filter((l: any) => l.moduleId === m.id)
   }))
+}
+
+export function createModule(courseId: number, input: { title: string; description?: string }) {
+  const title = requiredText(input.title, 'Title is required')
+  const description = input.description || ''
+  
+  const maxOrder = db!.prepare('SELECT MAX(orderIndex) as maxIdx FROM study_modules WHERE courseId = ?').getAsObject([courseId]) as { maxIdx: number | null }
+  const nextOrder = (maxOrder.maxIdx ?? -1) + 1
+  
+  run(
+    'INSERT INTO study_modules (courseId, title, description, orderIndex) VALUES (?, ?, ?, ?)',
+    [courseId, title, description, nextOrder]
+  )
+  
+  const id = db!.prepare('SELECT last_insert_rowid() as id').getAsObject().id as number
+  return { id, courseId, title, description, orderIndex: nextOrder }
+}
+
+export function createLesson(moduleId: number, input: { title: string; kind?: string; content?: string; homeworkPrompt?: string }) {
+  const title = requiredText(input.title, 'Title is required')
+  const kind = input.kind || 'lesson'
+  const content = input.content || ''
+  const homeworkPrompt = input.homeworkPrompt || ''
+  
+  const maxOrder = db!.prepare('SELECT MAX(orderIndex) as maxIdx FROM study_lessons WHERE moduleId = ?').getAsObject([moduleId]) as { maxIdx: number | null }
+  const nextOrder = (maxOrder.maxIdx ?? -1) + 1
+  
+  run(
+    'INSERT INTO study_lessons (moduleId, title, kind, content, homeworkPrompt, orderIndex) VALUES (?, ?, ?, ?, ?, ?)',
+    [moduleId, title, kind, content, homeworkPrompt, nextOrder]
+  )
+  
+  const id = db!.prepare('SELECT last_insert_rowid() as id').getAsObject().id as number
+  return { id, moduleId, title, kind, content, homeworkPrompt, orderIndex: nextOrder }
+}
+
+export function getStudyModules() {
+  return getCourseModules(1)
 }
 
 export function getStudyProgress(userId: number) {

@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 :root {
   /* Ultra-modern Zinc/SaaS color palette (shadcn style) */
@@ -15,7 +15,7 @@
   --pink-soft: rgba(168, 85, 247, 0.1);
   --danger: #ef4444;
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-  --font-sans: 'Inter', 'Outfit', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Montserrat', 'Inter', 'Outfit', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', Consolas, monospace;
 
   color: var(--text);

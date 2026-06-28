@@ -6,6 +6,11 @@ import {
   submitHomework,
   getAdminHomeworks,
   saveStudyProgress,
+  getCourses,
+  createCourse,
+  getCourseModules,
+  createModule,
+  createLesson,
 } from './database.ts'
 import { randomUUID } from 'node:crypto'
 import cors from 'cors'
@@ -284,6 +289,61 @@ app.use((error: Error, _request: Request, response: Response, _next: NextFunctio
 
 
 // --- Study API ---
+app.get('/api/study/courses', authMiddleware, (_req, res) => {
+  try {
+    res.json(getCourses())
+  } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
+
+app.post('/api/study/courses', authMiddleware, (req, res) => {
+  try {
+    if (req.user!.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Admins only' })
+    }
+    const course = createCourse(req.body)
+    res.json(course)
+  } catch (error: any) {
+    res.status(400).json({ error: error.message })
+  }
+})
+
+app.get('/api/study/courses/:id/modules', authMiddleware, (req, res) => {
+  try {
+    const courseId = Number(req.params.id)
+    res.json(getCourseModules(courseId))
+  } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
+
+app.post('/api/study/courses/:id/modules', authMiddleware, (req, res) => {
+  try {
+    if (req.user!.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Admins only' })
+    }
+    const courseId = Number(req.params.id)
+    const mod = createModule(courseId, req.body)
+    res.json(mod)
+  } catch (error: any) {
+    res.status(400).json({ error: error.message })
+  }
+})
+
+app.post('/api/study/modules/:id/lessons', authMiddleware, (req, res) => {
+  try {
+    if (req.user!.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Admins only' })
+    }
+    const moduleId = Number(req.params.id)
+    const lesson = createLesson(moduleId, req.body)
+    res.json(lesson)
+  } catch (error: any) {
+    res.status(400).json({ error: error.message })
+  }
+})
+
 app.get('/api/study/modules', authMiddleware, (_req, res) => {
   try {
     res.json(getStudyModules())
