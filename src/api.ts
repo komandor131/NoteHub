@@ -227,8 +227,22 @@ export async function toggleHabit(id: number, date: string, completed: boolean) 
 }
 
 
+export let authToken = '';
+
+export function setToken(token: string) {
+  authToken = token;
+}
+
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init)
+  const headers = new Headers(init?.headers);
+  if (authToken) {
+    headers.set('Authorization', `Bearer ${authToken}`);
+  }
+
+  const fullUrl = url.startsWith('/api/') ? `${API_BASE}${url}` : url;
+  const response = await fetch(fullUrl, { ...init, headers });
   if (response.status === 204) {
     return undefined as T
   }
@@ -246,6 +260,30 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 function queryString(params: URLSearchParams | undefined) {
   const value = params?.toString()
   return value ? `?${value}` : ''
+}
+
+export async function loginApi(payload: any) {
+  return request<any>('/api/auth/login', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function registerApi(payload: any) {
+  return request<any>('/api/auth/register', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function fetchMe() {
+  return request<any>('/api/auth/me')
+}
+
+export async function logoutApi() {
+  return request<void>('/api/auth/logout', { method: 'POST' })
 }
 
 export async function fetchMindMaps() {

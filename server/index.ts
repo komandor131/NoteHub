@@ -1,5 +1,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import {
+  getStudyModules,
+  getStudyProgress,
+  submitHomework,
+  getAdminHomeworks,
+  saveStudyProgress,
+} from './database.ts'
 import { randomUUID } from 'node:crypto'
 import cors from 'cors'
 import express, { type NextFunction, type Request, type Response } from 'express'
@@ -68,6 +75,8 @@ import {
   normalizeRoadmapInput,
 } from './database.ts'
 import { mathNotes } from './mathNotes.ts'
+import { authMiddleware } from './authMiddleware.ts'
+import { registerUser, loginUser, logoutSession } from './database.ts'
 
 const port = Number(process.env.PORT ?? 5174)
 const uploadsDir = path.join(process.cwd(), 'uploads')
@@ -96,83 +105,122 @@ app.use(cors())
 app.use(express.json({ limit: '2mb' }))
 app.use('/uploads', express.static(uploadsDir))
 
+
+app.post('/api/auth/register', (req, res) => {
+  try {
+    const result = registerUser(req.body)
+    res.json(result)
+  } catch (error: any) {
+    res.status(400).json({ error: error.message })
+  }
+})
+
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const result = loginUser(req.body)
+    res.json(result)
+  } catch (error: any) {
+    res.status(401).json({ error: error.message })
+  }
+})
+
+app.use('/api', (req, res, next) => {
+  if (req.path.startsWith('/auth') || req.path === '/health') {
+    return next()
+  }
+  authMiddleware(req, res, next)
+})
+
+app.post('/api/auth/logout', authMiddleware, (req, res) => {
+  const authHeader = req.headers.authorization
+  if (authHeader) {
+    const token = authHeader.split(' ')[1]
+    logoutSession(token)
+  }
+  res.status(204).end()
+})
+
+app.get('/api/auth/me', authMiddleware, (req, res) => {
+  res.json({ user: req.user })
+})
+
 app.get('/api/health', (_request, response) => {
   response.json({ ok: true })
 })
 
 app.get('/api/tasks', (request, response) => {
-  response.json(listTasks(1, toSearchParams(request)))
+  response.json(listTasks(request.user!.id, toSearchParams(request)))
 })
 
 app.post('/api/tasks', (request, response) => {
-  const task = createTask(1, normalizeTaskInput(request.body))
+  const task = createTask(request.user!.id, normalizeTaskInput(request.body))
   response.status(201).json(task)
 })
 
 app.put('/api/tasks/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getTask(1, id)) {
+  if (!getTask(request.user!.id, id)) {
     response.status(404).json({ error: 'Task not found' })
     return
   }
-  response.json(updateTask(1, id, normalizeTaskInput(request.body)))
+  response.json(updateTask(request.user!.id, id, normalizeTaskInput(request.body)))
 })
 
 app.delete('/api/tasks/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getTask(1, id)) {
+  if (!getTask(request.user!.id, id)) {
     response.status(404).json({ error: 'Task not found' })
     return
   }
-  const attachments = listAttachments(1, 'task', id)
-  deleteTask(1, id)
+  const attachments = listAttachments(request.user!.id, 'task', id)
+  deleteTask(request.user!.id, id)
   attachments.forEach((attachment) => removeUploadedFile(attachment.storedName))
   response.status(204).end()
 })
 
 app.get('/api/snippets', (request, response) => {
-  response.json(listSnippets(1, toSearchParams(request)))
+  response.json(listSnippets(request.user!.id, toSearchParams(request)))
 })
 
 app.post('/api/snippets', (request, response) => {
-  const snippet = createSnippet(1, normalizeSnippetInput(request.body))
+  const snippet = createSnippet(request.user!.id, normalizeSnippetInput(request.body))
   response.status(201).json(snippet)
 })
 
 app.put('/api/snippets/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getSnippet(1, id)) {
+  if (!getSnippet(request.user!.id, id)) {
     response.status(404).json({ error: 'Snippet not found' })
     return
   }
-  response.json(updateSnippet(1, id, normalizeSnippetInput(request.body)))
+  response.json(updateSnippet(request.user!.id, id, normalizeSnippetInput(request.body)))
 })
 
 app.delete('/api/snippets/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getSnippet(1, id)) {
+  if (!getSnippet(request.user!.id, id)) {
     response.status(404).json({ error: 'Snippet not found' })
     return
   }
-  const attachments = listAttachments(1, 'snippet', id)
-  deleteSnippet(1, id)
+  const attachments = listAttachments(request.user!.id, 'snippet', id)
+  deleteSnippet(request.user!.id, id)
   attachments.forEach((attachment) => removeUploadedFile(attachment.storedName))
   response.status(204).end()
 })
 
 app.get('/api/calendar', (request, response) => {
-  response.json(listTasks(1, toSearchParams(request)))
+  response.json(listTasks(request.user!.id, toSearchParams(request)))
 })
 
 app.get('/api/search', (request, response) => {
   const query = String(request.query.q ?? '').trim()
-  response.json(query ? searchAll(1, query) : { tasks: [], snippets: [] })
+  response.json(query ? searchAll(request.user!.id, query) : { tasks: [], snippets: [] })
 })
 
 app.get('/api/attachments', (request, response) => {
   const entityType = parseEntityType(request.query.entityType)
   const entityId = Number(request.query.entityId)
-  response.json(listAttachments(1, entityType, Number.isFinite(entityId) ? entityId : undefined))
+  response.json(listAttachments(request.user!.id, entityType, Number.isFinite(entityId) ? entityId : undefined))
 })
 
 app.post('/api/attachments', upload.single('file'), (request, response) => {
@@ -187,17 +235,17 @@ app.post('/api/attachments', upload.single('file'), (request, response) => {
 
   const entityExists =
     entityType === 'task'
-      ? getTask(1, entityId)
+      ? getTask(request.user!.id, entityId)
       : entityType === 'snippet'
-        ? getSnippet(1, entityId)
+        ? getSnippet(request.user!.id, entityId)
         : entityType === 'goal'
-          ? getGoal(1, entityId)
+          ? getGoal(request.user!.id, entityId)
           : entityType === 'diary'
-            ? getDiaryEntry(1, entityId)
+            ? getDiaryEntry(request.user!.id, entityId)
             : entityType === 'project'
-              ? getProject(1, entityId)
+              ? getProject(request.user!.id, entityId)
               : entityType === 'mindmap'
-                ? getMindMap(1, entityId)
+                ? getMindMap(request.user!.id, entityId)
                 : null
 
   if (!entityExists) {
@@ -206,7 +254,7 @@ app.post('/api/attachments', upload.single('file'), (request, response) => {
     return
   }
 
-  const attachment = createAttachment(1, {
+  const attachment = createAttachment(request.user!.id, {
     originalName: request.file.originalname,
     storedName: request.file.filename,
     mimeType: request.file.mimetype || 'application/octet-stream',
@@ -218,7 +266,7 @@ app.post('/api/attachments', upload.single('file'), (request, response) => {
 })
 
 app.delete('/api/attachments/:id', (request, response) => {
-  const attachment = deleteAttachment(1, parseId(request.params.id))
+  const attachment = deleteAttachment(request.user!.id, parseId(request.params.id))
   if (!attachment) {
     response.status(404).json({ error: 'Attachment not found' })
     return
@@ -233,13 +281,69 @@ app.use((error: Error, _request: Request, response: Response, _next: NextFunctio
   response.status(status).json({ error: error.message })
 })
 
+
+
+// --- Study API ---
+app.get('/api/study/modules', authMiddleware, (_req, res) => {
+  try {
+    res.json(getStudyModules())
+  } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
+
+app.get('/api/study/progress', authMiddleware, (req, res) => {
+  try {
+    res.json(getStudyProgress(req.user!.id))
+  } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
+
+app.post('/api/study/progress', authMiddleware, (req, res) => {
+  try {
+    const { lessonId, completed } = req.body
+    if (!lessonId) {
+      return res.status(400).json({ error: 'lessonId is required' })
+    }
+    saveStudyProgress(req.user!.id, Number(lessonId), completed ? 1 : 0)
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
+
+app.post('/api/study/homework', authMiddleware, (req, res) => {
+  try {
+    const { lesson_id, repository_url, live_url, comments } = req.body
+    if (!lesson_id || !repository_url) {
+      return res.status(400).json({ error: 'Lesson ID and Repository URL are required' })
+    }
+    submitHomework(req.user!.id, lesson_id, repository_url, live_url, comments)
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
+
+app.get('/api/study/admin/homeworks', authMiddleware, (req, res) => {
+  try {
+    if (req.user!.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+    res.json(getAdminHomeworks())
+  } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
+
 app.listen(port, () => {
   console.log(`NoteHub API listening on http://localhost:${port}`)
 })
 
 // Balance
-app.get('/api/balance', (_request, response) => {
-  response.json({ amount: getBalance(1) })
+app.get('/api/balance', (request, response) => {
+  response.json({ amount: getBalance(request.user!.id) })
 })
 
 app.put('/api/balance', (request, response) => {
@@ -248,144 +352,144 @@ app.put('/api/balance', (request, response) => {
     response.status(400).json({ error: 'amount is required and must be a number' })
     return
   }
-  response.json(updateBalance(1, amount))
+  response.json(updateBalance(request.user!.id, amount))
 })
 
 // Goals
-app.get('/api/finance/goals', (_request, response) => {
-  response.json(listGoals(1))
+app.get('/api/finance/goals', (request, response) => {
+  response.json(listGoals(request.user!.id))
 })
 
 app.post('/api/finance/goals', (request, response) => {
-  const goal = createGoal(1, normalizeGoalInput(request.body))
+  const goal = createGoal(request.user!.id, normalizeGoalInput(request.body))
   response.status(201).json(goal)
 })
 
 app.put('/api/finance/goals/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getGoal(1, id)) {
+  if (!getGoal(request.user!.id, id)) {
     response.status(404).json({ error: 'Goal not found' })
     return
   }
-  response.json(updateGoal(1, id, normalizeGoalInput(request.body)))
+  response.json(updateGoal(request.user!.id, id, normalizeGoalInput(request.body)))
 })
 
 app.delete('/api/finance/goals/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getGoal(1, id)) {
+  if (!getGoal(request.user!.id, id)) {
     response.status(404).json({ error: 'Goal not found' })
     return
   }
-  const attachments = listAttachments(1, 'goal', id)
-  deleteGoal(1, id)
+  const attachments = listAttachments(request.user!.id, 'goal', id)
+  deleteGoal(request.user!.id, id)
   attachments.forEach((attachment) => removeUploadedFile(attachment.storedName))
   response.status(204).end()
 })
 
 // Diary
-app.get('/api/diary', (_request, response) => {
-  response.json(listDiaryEntries(1))
+app.get('/api/diary', (request, response) => {
+  response.json(listDiaryEntries(request.user!.id))
 })
 
 app.post('/api/diary', (request, response) => {
-  const entry = createDiaryEntry(1, normalizeDiaryInput(request.body))
+  const entry = createDiaryEntry(request.user!.id, normalizeDiaryInput(request.body))
   response.status(201).json(entry)
 })
 
 app.put('/api/diary/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getDiaryEntry(1, id)) {
+  if (!getDiaryEntry(request.user!.id, id)) {
     response.status(404).json({ error: 'Diary entry not found' })
     return
   }
-  response.json(updateDiaryEntry(1, id, normalizeDiaryInput(request.body)))
+  response.json(updateDiaryEntry(request.user!.id, id, normalizeDiaryInput(request.body)))
 })
 
 app.delete('/api/diary/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getDiaryEntry(1, id)) {
+  if (!getDiaryEntry(request.user!.id, id)) {
     response.status(404).json({ error: 'Diary entry not found' })
     return
   }
-  const attachments = listAttachments(1, 'diary', id)
-  deleteDiaryEntry(1, id)
+  const attachments = listAttachments(request.user!.id, 'diary', id)
+  deleteDiaryEntry(request.user!.id, id)
   attachments.forEach((attachment) => removeUploadedFile(attachment.storedName))
   response.status(204).end()
 })
 
 // Subscriptions
-app.get('/api/subscriptions', (_request, response) => {
-  response.json(listSubscriptions(1))
+app.get('/api/subscriptions', (request, response) => {
+  response.json(listSubscriptions(request.user!.id))
 })
 
 app.post('/api/subscriptions', (request, response) => {
-  const sub = createSubscription(1, normalizeSubscriptionInput(request.body))
+  const sub = createSubscription(request.user!.id, normalizeSubscriptionInput(request.body))
   response.status(201).json(sub)
 })
 
 app.put('/api/subscriptions/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getSubscription(1, id)) {
+  if (!getSubscription(request.user!.id, id)) {
     response.status(404).json({ error: 'Subscription not found' })
     return
   }
-  response.json(updateSubscription(1, id, normalizeSubscriptionInput(request.body)))
+  response.json(updateSubscription(request.user!.id, id, normalizeSubscriptionInput(request.body)))
 })
 
 app.delete('/api/subscriptions/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getSubscription(1, id)) {
+  if (!getSubscription(request.user!.id, id)) {
     response.status(404).json({ error: 'Subscription not found' })
     return
   }
-  deleteSubscription(1, id)
+  deleteSubscription(request.user!.id, id)
   response.status(204).end()
 })
 
 // Projects
-app.get('/api/projects', (_request, response) => {
-  response.json(listProjects(1))
+app.get('/api/projects', (request, response) => {
+  response.json(listProjects(request.user!.id))
 })
 
 app.post('/api/projects', (request, response) => {
-  const project = createProject(1, normalizeProjectInput(request.body))
+  const project = createProject(request.user!.id, normalizeProjectInput(request.body))
   response.status(201).json(project)
 })
 
 app.put('/api/projects/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getProject(1, id)) {
+  if (!getProject(request.user!.id, id)) {
     response.status(404).json({ error: 'Project not found' })
     return
   }
-  response.json(updateProject(1, id, normalizeProjectInput(request.body)))
+  response.json(updateProject(request.user!.id, id, normalizeProjectInput(request.body)))
 })
 
 app.delete('/api/projects/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getProject(1, id)) {
+  if (!getProject(request.user!.id, id)) {
     response.status(404).json({ error: 'Project not found' })
     return
   }
-  const attachments = listAttachments(1, 'project', id)
-  deleteProject(1, id)
+  const attachments = listAttachments(request.user!.id, 'project', id)
+  deleteProject(request.user!.id, id)
   attachments.forEach((attachment) => removeUploadedFile(attachment.storedName))
   response.status(204).end()
 })
 
 // Habits
-app.get('/api/habits', (_request, response) => {
-  response.json(listHabits(1))
+app.get('/api/habits', (request, response) => {
+  response.json(listHabits(request.user!.id))
 })
 
 app.post('/api/habits', (request, response) => {
-  const habit = createHabit(1, normalizeHabitInput(request.body))
+  const habit = createHabit(request.user!.id, normalizeHabitInput(request.body))
   response.status(201).json(habit)
 })
 
 app.delete('/api/habits/:id', (request, response) => {
   const id = parseId(request.params.id)
-  deleteHabit(1, id)
+  deleteHabit(request.user!.id, id)
   response.status(204).end()
 })
 
@@ -397,17 +501,17 @@ app.post('/api/habits/:id/toggle', (request, response) => {
     response.status(400).json({ error: 'date is required' })
     return
   }
-  response.json(toggleHabitLog(1, id, date, completed))
+  response.json(toggleHabitLog(request.user!.id, id, date, completed))
 })
 
 // Mind Maps
-app.get('/api/mindmaps', (_request, response) => {
-  response.json(listMindMaps(1))
+app.get('/api/mindmaps', (request, response) => {
+  response.json(listMindMaps(request.user!.id))
 })
 
 app.get('/api/mindmaps/:id', (request, response) => {
   const id = parseId(request.params.id)
-  const map = getMindMap(1, id)
+  const map = getMindMap(request.user!.id, id)
   if (!map) {
     response.status(404).json({ error: 'MindMap not found' })
     return
@@ -416,39 +520,39 @@ app.get('/api/mindmaps/:id', (request, response) => {
 })
 
 app.post('/api/mindmaps', (request, response) => {
-  const map = createMindMap(1, normalizeMindMapInput(request.body))
+  const map = createMindMap(request.user!.id, normalizeMindMapInput(request.body))
   response.status(201).json(map)
 })
 
 app.put('/api/mindmaps/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getMindMap(1, id)) {
+  if (!getMindMap(request.user!.id, id)) {
     response.status(404).json({ error: 'MindMap not found' })
     return
   }
-  response.json(updateMindMap(1, id, normalizeMindMapInput(request.body)))
+  response.json(updateMindMap(request.user!.id, id, normalizeMindMapInput(request.body)))
 })
 
 app.delete('/api/mindmaps/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getMindMap(1, id)) {
+  if (!getMindMap(request.user!.id, id)) {
     response.status(404).json({ error: 'MindMap not found' })
     return
   }
-  const attachments = listAttachments(1, 'mindmap', id)
-  deleteMindMap(1, id)
+  const attachments = listAttachments(request.user!.id, 'mindmap', id)
+  deleteMindMap(request.user!.id, id)
   attachments.forEach((attachment) => removeUploadedFile(attachment.storedName))
   response.status(204).end()
 })
 
 // Roadmaps
-app.get('/api/roadmaps', (_request, response) => {
-  response.json(listRoadmaps(1))
+app.get('/api/roadmaps', (request, response) => {
+  response.json(listRoadmaps(request.user!.id))
 })
 
 app.get('/api/roadmaps/:id', (request, response) => {
   const id = parseId(request.params.id)
-  const roadmap = getRoadmap(1, id)
+  const roadmap = getRoadmap(request.user!.id, id)
   if (!roadmap) {
     response.status(404).json({ error: 'Roadmap not found' })
     return
@@ -457,26 +561,26 @@ app.get('/api/roadmaps/:id', (request, response) => {
 })
 
 app.post('/api/roadmaps', (request, response) => {
-  const roadmap = createRoadmap(1, normalizeRoadmapInput(request.body))
+  const roadmap = createRoadmap(request.user!.id, normalizeRoadmapInput(request.body))
   response.status(201).json(roadmap)
 })
 
 app.put('/api/roadmaps/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getRoadmap(1, id)) {
+  if (!getRoadmap(request.user!.id, id)) {
     response.status(404).json({ error: 'Roadmap not found' })
     return 
   }
-  response.json(updateRoadmap(1, id, normalizeRoadmapInput(request.body)))
+  response.json(updateRoadmap(request.user!.id, id, normalizeRoadmapInput(request.body)))
 })
 
 app.delete('/api/roadmaps/:id', (request, response) => {
   const id = parseId(request.params.id)
-  if (!getRoadmap(1, id)) {
+  if (!getRoadmap(request.user!.id, id)) {
     response.status(404).json({ error: 'Roadmap not found' })
     return
   }
-  deleteRoadmap(1, id)
+  deleteRoadmap(request.user!.id, id)
   response.status(204).end()
 })
 

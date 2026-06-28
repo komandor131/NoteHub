@@ -2647,7 +2647,6 @@ function seedIfEmpty(adminUserId: number) {
             id: "ops_5_api",
             title: "11.5 Створення API (FastAPI)",
             text: "Створення веб-сервісів для прийому вхідних ознак та повернення передбачень.",
-            linkUrl: "https://fastapi.tiangolo.com/tutorial/",
             linkLabel: "FastAPI Tutorial",
             substeps: [
               { id: "ops_5_api_1", title: "11.5.1 Створення FastAPI", text: "Асинхронні ендпоінти, використання Pydantic для суворої валідації вхідних JSON." },
@@ -2995,7 +2994,7 @@ function persist() {
   fs.writeFileSync(dbPath, Buffer.from(data))
 }
 
-function ensureDb() {
+export function ensureDb() {
   if (!db) {
     throw new Error('Database has not been initialized')
   }
@@ -3590,12 +3589,13 @@ export function normalizeMindMapInput(body: unknown): MindMapInput {
   }
 }
 
-export function listRoadmaps(userId: number) {
-  return all<RoadmapRecord>('SELECT * FROM roadmaps WHERE ownerId = ? ORDER BY title ASC', [userId], mapRoadmap)
+export function listRoadmaps(_userId: number) {
+  // User explicitly requested roadmaps to be visible to all users
+  return all<RoadmapRecord>('SELECT * FROM roadmaps ORDER BY title ASC', [], mapRoadmap)
 }
 
-export function getRoadmap(userId: number, id: number) {
-  return one<RoadmapRecord>('SELECT * FROM roadmaps WHERE id = ? AND ownerId = ?', [id, userId], mapRoadmap)
+export function getRoadmap(_userId: number, id: number) {
+  return one<RoadmapRecord>('SELECT * FROM roadmaps WHERE id = ?', [id], mapRoadmap)
 }
 
 export function createRoadmap(userId: number, input: RoadmapInput) {
@@ -3687,7 +3687,7 @@ function getUserById(id: number) {
 
 function createSession(user: UserRecord): AuthResult {
   const token = randomBytes(32).toString('hex')
-  run('INSERT INTO auth_sessions (token, userId) VALUES (?, ?)', [token, user.id])
+  run('INSERT INTO auth_sessions (token, userId, createdAt) VALUES (?, ?, ?)', [token, user.id, new Date().toISOString()])
   persist()
   return { user, token }
 }
@@ -3704,5 +3704,119 @@ function mapUser(row: Row): UserRecord {
 }
 
 function seedStudyContent() {
-  // Mocked for now
+  const existingModules = db!.prepare('SELECT COUNT(*) as count FROM study_modules').getAsObject() as { count: number }
+  if (existingModules.count > 0) return
+
+  console.log('Seeding NoteHub Study content...')
+  
+  const insertModule = db!.prepare('INSERT INTO study_modules (title, orderIndex) VALUES (?, ?)')
+  const insertLesson = db!.prepare('INSERT INTO study_lessons (moduleId, title, kind, content, orderIndex) VALUES (?, ?, ?, ?, ?)')
+  
+  const modules = [
+    'Модуль 1. Основи HTML',
+    'Модуль 2. Вступ до CSS',
+    'Модуль 3. Блокова модель. Flexbox',
+    'Модуль 4. Декоративні ефекти',
+    'Модуль 5. Елементи форм. Доступність',
+    'Модуль 6. Адаптивний дизайн'
+  ]
+
+  let moduleId = 1
+  for (const [index, modTitle] of modules.entries()) {
+    insertModule.run([modTitle, index])
+    
+    // Add default lessons to each module
+    if (index === 5) { // Модуль 6
+      const lessons = [
+        { title: 'Програма модуля', type: 'training', content: 'Цього тижня ми маємо вивчити принципи адаптивного дизайну веб-сторінок. Ця навичка дозволить тобі створювати більш зручні для користувачів сторінки.' },
+        { title: 'Респонсивні сторінки', type: 'training', content: 'Респонсивний дизайн робить вашу сторінку зручною на будь-якому пристрої.' },
+        { title: 'Медіазапити', type: 'training', content: 'Медіазапити (@media) дозволяють застосовувати стилі залежно від розміру екрану.' },
+        { title: 'Логічні оператори', type: 'training', content: 'Використання and, or, not у медіазапитах.' },
+        { title: 'Підхід «Mobile First»', type: 'training', content: 'Спочатку стилізуйте для мобільних, а потім розширюйте для десктопів.' },
+        { title: 'Адаптивна графіка', type: 'training', content: 'Зображення та відео також повинні адаптуватися під екран.' },
+        { title: 'Lesson', type: 'lesson', content: 'Відео-лекція модуля 6.' },
+        { title: 'Task', type: 'task', content: 'Домашнє завдання: Створити респонсивний макет за допомогою Grid та Flexbox.' }
+      ]
+      
+      lessons.forEach((l, i) => {
+        insertLesson.run([moduleId, l.title, l.type, l.content, i])
+      })
+    } else {
+      insertLesson.run([moduleId, 'Програма модуля', 'training', 'Вступний матеріал', 0])
+      insertLesson.run([moduleId, 'Task', 'task', 'Практичне завдання', 1])
+    }
+    moduleId++
+  }
+}
+
+
+export function getStudyModules() {
+  const modules = all('SELECT * FROM study_modules ORDER BY orderIndex ASC', {}, (row) => row)
+  const lessons = all('SELECT * FROM study_lessons ORDER BY orderIndex ASC', {}, (row) => row)
+  
+  return modules.map((m: any) => ({
+    ...m,
+    lessons: lessons.filter((l: any) => l.moduleId === m.id)
+  }))
+}
+
+export function getStudyProgress(userId: number) {
+  return all('SELECT * FROM study_progress WHERE userId = ?', [userId], (row) => ({
+    userId: numberValue(row.userId),
+    lessonId: numberValue(row.lessonId),
+    completed: numberValue(row.completed),
+    updatedAt: row.updatedAt
+  }))
+}
+
+export function saveStudyProgress(userId: number, lessonId: number, completed: number) {
+  const existing = one<{ userId: number }>('SELECT userId FROM study_progress WHERE userId = ? AND lessonId = ?', [userId, lessonId], (row) => ({ userId: numberValue(row.userId) }))
+  if (existing) {
+    run('UPDATE study_progress SET completed = ?, updatedAt = ? WHERE userId = ? AND lessonId = ?', [
+      completed,
+      new Date().toISOString(),
+      userId,
+      lessonId
+    ])
+  } else {
+    run('INSERT INTO study_progress (userId, lessonId, completed, updatedAt) VALUES (?, ?, ?, ?)', [
+      userId,
+      lessonId,
+      completed,
+      new Date().toISOString()
+    ])
+  }
+}
+
+export function submitHomework(userId: number, lessonId: number, repositoryUrl: string, liveUrl: string, comments: string) {
+  run('INSERT INTO homework_submissions (userId, lessonId, repositoryUrl, liveUrl, comments, createdAt) VALUES (?, ?, ?, ?, ?, ?)', [
+    userId,
+    lessonId,
+    repositoryUrl,
+    liveUrl,
+    comments || '',
+    new Date().toISOString()
+  ])
+  
+  saveStudyProgress(userId, lessonId, 1)
+}
+
+export function getAdminHomeworks() {
+  return all(`
+    SELECT h.*, u.email as user_email, l.title as lesson_title
+    FROM homework_submissions h
+    JOIN users u ON h.userId = u.id
+    JOIN study_lessons l ON h.lessonId = l.id
+    ORDER BY h.createdAt DESC
+  `, {}, (row) => ({
+    id: numberValue(row.id),
+    userId: numberValue(row.userId),
+    lessonId: numberValue(row.lessonId),
+    repositoryUrl: row.repositoryUrl,
+    liveUrl: row.liveUrl,
+    comments: row.comments,
+    createdAt: row.createdAt,
+    user_email: row.user_email,
+    lesson_title: row.lesson_title
+  }))
 }
