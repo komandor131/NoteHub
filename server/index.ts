@@ -11,6 +11,11 @@ import {
   getCourseModules,
   createModule,
   createLesson,
+  recordStudyVisit,
+  getStudyVisits,
+  addStudyTime,
+  getStudyTime,
+  getStudyStreak,
 } from './database.ts'
 import { randomUUID } from 'node:crypto'
 import cors from 'cors'
@@ -392,6 +397,53 @@ app.get('/api/study/admin/homeworks', authMiddleware, (req, res) => {
       return res.status(403).json({ error: 'Forbidden' })
     }
     res.json(getAdminHomeworks())
+  } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
+
+app.get('/api/study/stats', authMiddleware, (req, res) => {
+  try {
+    const userId = req.user!.id
+    const streak = getStudyStreak(userId)
+    const today = new Date()
+    const day = today.getDay()
+    const diff = today.getDate() - day + (day === 0 ? -6 : 1)
+    const monday = new Date(today.setDate(diff))
+    const weekStart = monday.toLocaleDateString('sv')
+    
+    const weeklySeconds = getStudyTime(userId, weekStart)
+    const visits = getStudyVisits(userId)
+    
+    res.json({ streak, weeklySeconds, visits })
+  } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
+
+app.post('/api/study/visit', authMiddleware, (req, res) => {
+  try {
+    const { date } = req.body
+    if (!date) {
+      return res.status(400).json({ error: 'Date is required' })
+    }
+    recordStudyVisit(req.user!.id, date)
+    const streak = getStudyStreak(req.user!.id)
+    res.json({ success: true, streak })
+  } catch (error) {
+    res.status(500).json({ error: String(error) })
+  }
+})
+
+app.post('/api/study/time', authMiddleware, (req, res) => {
+  try {
+    const { seconds, weekStart } = req.body
+    if (typeof seconds !== 'number' || !weekStart) {
+      return res.status(400).json({ error: 'seconds and weekStart are required' })
+    }
+    addStudyTime(req.user!.id, seconds, weekStart)
+    const weeklySeconds = getStudyTime(req.user!.id, weekStart)
+    res.json({ success: true, weeklySeconds })
   } catch (error) {
     res.status(500).json({ error: String(error) })
   }

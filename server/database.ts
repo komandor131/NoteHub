@@ -900,6 +900,23 @@ function migrate() {
   } catch (e) {
     // Ignore error if column already exists
   }
+
+  run(`
+    CREATE TABLE IF NOT EXISTS study_visits (
+      userId INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      PRIMARY KEY (userId, date)
+    );
+  `)
+
+  run(`
+    CREATE TABLE IF NOT EXISTS study_time (
+      userId INTEGER NOT NULL,
+      weekStart TEXT NOT NULL,
+      durationSeconds INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (userId, weekStart)
+    );
+  `)
 }
 
 function seedDefaultUsers() {
@@ -4223,4 +4240,66 @@ export function getAdminHomeworks() {
     user_email: row.user_email,
     lesson_title: row.lesson_title
   }))
+}
+
+export function getStudyStreak(userId: number): number {
+  const visits = all(
+    'SELECT date FROM study_visits WHERE userId = ? ORDER BY date DESC',
+    [userId],
+    (row) => row.date as string
+  )
+  if (visits.length === 0) return 0
+
+  const todayStr = new Date().toLocaleDateString('sv')
+  const yesterdayStr = new Date(Date.now() - 86400000).toLocaleDateString('sv')
+
+  if (visits[0] !== todayStr && visits[0] !== yesterdayStr) {
+    return 0
+  }
+
+  let streak = 0
+  let checkDate = new Date(visits[0])
+  const visitedSet = new Set(visits)
+
+  while (true) {
+    const dateStr = checkDate.toLocaleDateString('sv')
+    if (visitedSet.has(dateStr)) {
+      streak++
+      checkDate.setDate(checkDate.getDate() - 1)
+    } else {
+      break
+    }
+  }
+
+  return streak
+}
+
+export function recordStudyVisit(userId: number, date: string) {
+  run('INSERT OR IGNORE INTO study_visits (userId, date) VALUES (?, ?)', [userId, date])
+}
+
+export function getStudyVisits(userId: number): string[] {
+  return all('SELECT date FROM study_visits WHERE userId = ? ORDER BY date ASC', [userId], (row) => row.date as string)
+}
+
+export function addStudyTime(userId: number, seconds: number, weekStart: string) {
+  const existing = one<{ userId: number }>('SELECT userId FROM study_time WHERE userId = ? AND weekStart = ?', [userId, weekStart], (row) => ({ userId: numberValue(row.userId) }))
+  if (existing) {
+    run('UPDATE study_time SET durationSeconds = durationSeconds + ? WHERE userId = ? AND weekStart = ?', [
+      seconds,
+      userId,
+      weekStart
+    ])
+  } else {
+    run('INSERT INTO study_time (userId, weekStart, durationSeconds) VALUES (?, ?, ?)', [
+      userId,
+      weekStart,
+      seconds
+    ])
+  }
+}
+
+export function getStudyTime(userId: number, weekStart: string): number {
+  const row = one<{ duration: number }>('SELECT durationSeconds FROM study_time WHERE userId = ? AND weekStart = ?', [userId, weekStart], (row) => ({ duration: numberValue(row.durationSeconds) }))
+  return row ? row.duration : 0
 }

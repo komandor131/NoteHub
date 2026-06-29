@@ -157,6 +157,58 @@ export default function StudyPanel({ onExit }: { onExit: () => void }) {
   const [code, setCode] = useState('# Пишіть ваш Python код тут\nprint("Привіт, NoteHub!")\n')
   const [terminalOutput, setTerminalOutput] = useState('Тут з\'явиться результат виконання коду...')
 
+  // Dynamic stats states
+  const [streak, setStreak] = useState(0)
+  const [weeklySeconds, setWeeklySeconds] = useState(0)
+  const [visits, setVisits] = useState<string[]>([])
+
+  // Helper to format study duration (seconds) into Ukrainian text
+  const formatDuration = (totalSeconds: number) => {
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    return `${hours} год. ${minutes} хв.`
+  }
+
+  // Calculate percentage of 14-hour target (14 * 3600 = 50400 seconds)
+  const durationPercentage = Math.min(100, Math.round((weeklySeconds / 50400) * 100))
+
+  // Comment based on progress
+  const getProgressComment = (totalSeconds: number) => {
+    const hours = totalSeconds / 3600
+    if (hours < 3) return 'Гарний старт! (Good start!)'
+    if (hours < 7) return 'Продовжуйте в тому ж дусі!'
+    if (hours < 14) return 'Чудовий прогрес!'
+    return 'Ціль досягнута! Ви молодець! 🎉'
+  }
+
+  // Ukrainian day formatting for streak
+  const formatStreakText = (count: number) => {
+    if (count % 10 === 1 && count % 100 !== 11) {
+      return 'день поспіль'
+    } else if ([2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100)) {
+      return 'дні поспіль'
+    } else {
+      return 'днів поспіль'
+    }
+  }
+
+  // Compute current week's dates (Mon-Sun)
+  const weekDayLabels = ['Пн', 'Вв', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
+  const currentWeekDates = useMemo(() => {
+    const today = new Date()
+    const day = today.getDay()
+    const diff = today.getDate() - day + (day === 0 ? -6 : 1) // adjust when day is Sunday
+    const monday = new Date(today.setDate(diff))
+    
+    const dates = []
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday)
+      d.setDate(monday.getDate() + i)
+      dates.push(d.toLocaleDateString('sv')) // 'sv' format yields 'YYYY-MM-DD'
+    }
+    return dates
+  }, [])
+
   // Fetch initial courses and progress
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -175,6 +227,98 @@ export default function StudyPanel({ onExit }: { onExit: () => void }) {
         console.error(err)
         setLoading(false)
       })
+  }, [])
+
+  // Record visit and fetch stats
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    const todayStr = new Date().toLocaleDateString('sv')
+
+    // 1. Record today's visit
+    fetch(`${import.meta.env.VITE_API_URL || ''}/api/study/visit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ date: todayStr })
+    })
+      .then(() => {
+        // 2. Fetch fresh stats
+        return fetch(`${import.meta.env.VITE_API_URL || ''}/api/study/stats`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.streak !== undefined) setStreak(data.streak)
+        if (data.weeklySeconds !== undefined) setWeeklySeconds(data.weeklySeconds)
+        if (data.visits !== undefined) setVisits(data.visits)
+      })
+      .catch(console.error)
+  }, [])
+
+  // Study time tracking hook
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    let localSeconds = 0
+
+    const interval = setInterval(() => {
+      // Only track if tab is active/visible
+      if (document.visibilityState === 'visible') {
+        localSeconds += 10
+        setWeeklySeconds(prev => prev + 10)
+      }
+    }, 10000)
+
+    // Sync study time to backend every 30 seconds
+    const syncInterval = setInterval(() => {
+      if (localSeconds > 0) {
+        const today = new Date()
+        const day = today.getDay()
+        const diff = today.getDate() - day + (day === 0 ? -6 : 1)
+        const monday = new Date(today.setDate(diff))
+        const weekStart = monday.toLocaleDateString('sv')
+
+        const secondsToSync = localSeconds
+        localSeconds = 0
+
+        fetch(`${import.meta.env.VITE_API_URL || ''}/api/study/time`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ seconds: secondsToSync, weekStart })
+        }).catch(console.error)
+      }
+    }, 30000)
+
+    return () => {
+      clearInterval(interval)
+      clearInterval(syncInterval)
+      // Sync remaining seconds on unmount/exit
+      if (localSeconds > 0) {
+        const today = new Date()
+        const day = today.getDay()
+        const diff = today.getDate() - day + (day === 0 ? -6 : 1)
+        const monday = new Date(today.setDate(diff))
+        const weekStart = monday.toLocaleDateString('sv')
+
+        fetch(`${import.meta.env.VITE_API_URL || ''}/api/study/time`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ seconds: localSeconds, weekStart })
+        }).catch(console.error)
+      }
+    }
   }, [])
 
   // Load modules for the selected course
@@ -512,14 +656,17 @@ export default function StudyPanel({ onExit }: { onExit: () => void }) {
                 <div className="flex-1 flex flex-col items-center">
                   <span className="text-sm font-bold text-white mb-4">Відвідуваність</span>
                   <div className="flex gap-2.5">
-                    {['Нд', 'Пн', 'Вв', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'].map((day, idx) => (
-                      <div key={idx} className="flex flex-col items-center gap-1.5">
-                        <span className="text-[10px] text-gray-500 font-semibold">{day}</span>
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all ${idx < 4 ? 'bg-[#a855f7]/10 border-[#a855f7]/30 text-[#a855f7]' : 'bg-transparent border-[#27272a] text-gray-600'}`}>
-                          {idx < 4 ? <Check size={14} strokeWidth={3} /> : null}
+                    {currentWeekDates.map((dateStr, idx) => {
+                      const visited = visits.includes(dateStr)
+                      return (
+                        <div key={idx} className="flex flex-col items-center gap-1.5">
+                          <span className="text-[10px] text-gray-500 font-semibold">{weekDayLabels[idx]}</span>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all ${visited ? 'bg-[#a855f7]/10 border-[#a855f7]/30 text-[#a855f7]' : 'bg-transparent border-[#27272a] text-gray-600'}`}>
+                            {visited ? <Check size={14} strokeWidth={3} /> : null}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                   <button className="mt-5 text-xs border border-[#a855f7]/20 hover:border-[#a855f7]/50 hover:bg-[#a855f7]/5 text-[#c084fc] font-semibold px-4 py-2 rounded-xl transition-all">
                     Do not count the missed class
@@ -529,8 +676,8 @@ export default function StudyPanel({ onExit }: { onExit: () => void }) {
                 {/* Streak Metric */}
                 <div className="w-full md:w-32 bg-[#27272a]/40 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
                   <span className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Серія занять</span>
-                  <span className="text-4xl font-black text-white my-1">1</span>
-                  <span className="text-[11px] text-gray-300 font-medium">день поспіль</span>
+                  <span className="text-4xl font-black text-white my-1">{streak}</span>
+                  <span className="text-[11px] text-gray-300 font-medium">{formatStreakText(streak)}</span>
                 </div>
               </div>
 
@@ -548,13 +695,13 @@ export default function StudyPanel({ onExit }: { onExit: () => void }) {
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs font-bold text-white">
-                    <span>2 год. 58 хв.</span>
+                    <span>{formatDuration(weeklySeconds)}</span>
                     <span className="text-gray-500">ціль: 14 год.</span>
                   </div>
                   <div className="w-full bg-[#27272a] h-2.5 rounded-full overflow-hidden">
-                    <div className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full" style={{ width: '21%' }} />
+                    <div className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full" style={{ width: `${durationPercentage}%` }} />
                   </div>
-                  <span className="text-[10px] text-[#c084fc] font-bold block">Good start!</span>
+                  <span className="text-[10px] text-[#c084fc] font-bold block">{getProgressComment(weeklySeconds)}</span>
                 </div>
               </div>
 
