@@ -2993,7 +2993,7 @@ function taskTouchesRange(task: TaskRecord, from: string | null | undefined, to:
   })
 }
 
-function run(statement: string, params?: BindParams) {
+export function run(statement: string, params?: BindParams) {
   ensureDb().run(statement, params)
 }
 
