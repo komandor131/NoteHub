@@ -162,6 +162,22 @@ export default function StudyPanel({ onExit }: { onExit: () => void }) {
   const [weeklySeconds, setWeeklySeconds] = useState(0)
   const [visits, setVisits] = useState<string[]>([])
 
+  // Section-by-section pagination states
+  const [visibleSections, setVisibleSections] = useState(1)
+  const [totalSections, setTotalSections] = useState(1)
+
+  useEffect(() => {
+    setVisibleSections(1)
+    if (selectedLesson) {
+      const parser = new DOMParser()
+      const doc = parser.parseFromString(selectedLesson.content, 'text/html')
+      const sections = doc.querySelectorAll('.lesson-section')
+      setTotalSections(sections.length || 1)
+    } else {
+      setTotalSections(1)
+    }
+  }, [selectedLesson])
+
   // Helper to format study duration (seconds) into Ukrainian text
   const formatDuration = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600)
@@ -259,6 +275,50 @@ export default function StudyPanel({ onExit }: { onExit: () => void }) {
       })
       .catch(console.error)
   }, [])
+
+  // Event delegation for inline quizzes
+  useEffect(() => {
+    const handleContentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+
+      const checkBtn = target.closest('.quiz-check-btn') as HTMLButtonElement | null;
+      if (checkBtn) {
+        const container = checkBtn.closest('.quiz-container') as HTMLElement | null;
+        if (container) {
+          const correctIdx = container.getAttribute('data-correct-index');
+          const feedback = container.querySelector('.quiz-feedback') as HTMLElement | null;
+          const feedbackText = container.querySelector('.quiz-feedback-text') as HTMLElement | null;
+          const explanation = container.getAttribute('data-explanation') || 'Правильна відповідь!';
+
+          const selectedRadio = container.querySelector('input[type="radio"]:checked') as HTMLInputElement | null;
+          if (selectedRadio) {
+            const parentOption = selectedRadio.closest('.quiz-option') as HTMLElement | null;
+            if (parentOption) {
+              const selectedIdx = parentOption.getAttribute('data-index');
+              if (selectedIdx === correctIdx) {
+                if (feedback && feedbackText) {
+                  feedback.style.display = 'block';
+                  feedbackText.className = 'quiz-feedback-text font-semibold text-emerald-400 mt-3 text-xs sm:text-sm';
+                  feedbackText.innerHTML = '✓ Result: ' + explanation;
+                }
+              } else {
+                if (feedback && feedbackText) {
+                  feedback.style.display = 'block';
+                  feedbackText.className = 'quiz-feedback-text font-semibold text-rose-400 mt-3 text-xs sm:text-sm';
+                  feedbackText.innerHTML = '✗ Неправильно. Спробуйте ще раз!';
+                }
+              }
+            }
+          } else {
+            alert('Будь ласка, оберіть варіант відповіді!');
+          }
+        }
+      }
+    };
+
+    document.addEventListener('click', handleContentClick);
+    return () => document.removeEventListener('click', handleContentClick);
+  }, [selectedLesson]);
 
   // Study time tracking hook
   useEffect(() => {
@@ -960,22 +1020,46 @@ export default function StudyPanel({ onExit }: { onExit: () => void }) {
                     </h1>
 
                     <div
-                      className="prose prose-invert prose-base max-w-none prose-p:text-gray-300 prose-p:leading-relaxed prose-headings:text-white prose-pre:bg-[#18181b] prose-pre:border prose-pre:border-[#27272a] prose-li:text-gray-300"
+                      className="lesson-content-wrapper prose prose-invert prose-base max-w-none prose-p:text-gray-300 prose-p:leading-relaxed prose-headings:text-white prose-pre:bg-[#18181b] prose-pre:border prose-pre:border-[#27272a] prose-li:text-gray-300"
+                      data-visible-sections={visibleSections}
                       dangerouslySetInnerHTML={{ __html: selectedLesson.content }}
                     />
 
-                    {/* Proceed Action Button */}
-                    <div className="mt-16 pt-8 border-t border-[#27272a] flex justify-center">
-                      <button
-                        onClick={handleCompleteAndNext}
-                        disabled={actionLoading}
-                        className="w-full max-w-xl flex items-center justify-center gap-2 bg-[#a855f7] hover:bg-[#8b5cf6] text-white disabled:opacity-50 font-bold px-6 py-4 rounded-xl transition-all shadow-lg active:scale-[0.98]"
-                      >
-                        <Sparkles size={16} className="text-yellow-300 animate-pulse shrink-0" />
-                        <span className="text-sm tracking-wide uppercase">
-                          {isLessonCompleted(selectedLesson.id) ? 'Наступний блок →' : 'Приступити до наступного блоку ✓'}
-                        </span>
-                      </button>
+                    {/* Go Further / Next Section Button OR Final Next Block Button */}
+                    <div className="mt-16 pt-8 border-t border-[#27272a] flex flex-col items-center gap-4">
+                      {visibleSections < totalSections ? (
+                        <button
+                          onClick={() => {
+                            setVisibleSections(prev => {
+                              const newVal = prev + 1;
+                              setTimeout(() => {
+                                const wrapper = document.querySelector('.lesson-content-wrapper');
+                                if (wrapper) {
+                                  const sections = wrapper.querySelectorAll('.lesson-section');
+                                  if (sections && sections[newVal - 1]) {
+                                    sections[newVal - 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  }
+                                }
+                              }, 50);
+                              return newVal;
+                            });
+                          }}
+                          className="w-full max-w-xl flex items-center justify-center gap-2 bg-[#27272a] hover:bg-[#3f3f46] text-white border border-[#3f3f46] font-bold px-6 py-4 rounded-xl transition-all active:scale-[0.98] cursor-pointer"
+                        >
+                          <span className="text-sm tracking-wide uppercase">Поїхали далі</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleCompleteAndNext}
+                          disabled={actionLoading}
+                          className="w-full max-w-xl flex items-center justify-center gap-2 bg-[#a855f7] hover:bg-[#8b5cf6] text-white disabled:opacity-50 font-bold px-6 py-4 rounded-xl transition-all shadow-lg active:scale-[0.98] cursor-pointer"
+                        >
+                          <Sparkles size={16} className="text-yellow-300 animate-pulse shrink-0" />
+                          <span className="text-sm tracking-wide uppercase">
+                            {isLessonCompleted(selectedLesson.id) ? 'Наступний блок →' : 'Приступити до наступного блоку ✓'}
+                          </span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1148,6 +1232,110 @@ export default function StudyPanel({ onExit }: { onExit: () => void }) {
 
       {/* Styled Custom scrollbar styling */}
       <style dangerouslySetInnerHTML={{ __html: `
+        .lesson-content-wrapper .lesson-section {
+          display: none;
+          opacity: 0;
+          transition: opacity 0.5s ease-in-out;
+        }
+        .lesson-content-wrapper[data-visible-sections="1"] .lesson-section:nth-of-type(1) {
+          display: block;
+          opacity: 1;
+        }
+        .lesson-content-wrapper[data-visible-sections="2"] .lesson-section:nth-of-type(-n+2) {
+          display: block;
+          opacity: 1;
+        }
+        .lesson-content-wrapper[data-visible-sections="3"] .lesson-section:nth-of-type(-n+3) {
+          display: block;
+          opacity: 1;
+        }
+        .lesson-content-wrapper[data-visible-sections="4"] .lesson-section:nth-of-type(-n+4) {
+          display: block;
+          opacity: 1;
+        }
+        .lesson-content-wrapper[data-visible-sections="5"] .lesson-section:nth-of-type(-n+5) {
+          display: block;
+          opacity: 1;
+        }
+        .lesson-content-wrapper[data-visible-sections="6"] .lesson-section:nth-of-type(-n+6) {
+          display: block;
+          opacity: 1;
+        }
+        .lesson-content-wrapper[data-visible-sections="7"] .lesson-section:nth-of-type(-n+7) {
+          display: block;
+          opacity: 1;
+        }
+        .lesson-content-wrapper[data-visible-sections="8"] .lesson-section:nth-of-type(-n+8) {
+          display: block;
+          opacity: 1;
+        }
+        .lesson-content-wrapper[data-visible-sections="9"] .lesson-section:nth-of-type(-n+9) {
+          display: block;
+          opacity: 1;
+        }
+        .lesson-content-wrapper[data-visible-sections="10"] .lesson-section:nth-of-type(-n+10) {
+          display: block;
+          opacity: 1;
+        }
+        .lesson-content-wrapper:not(:has(.lesson-section)) > * {
+          display: block !important;
+          opacity: 1 !important;
+        }
+        .quiz-container {
+          background: #18181b;
+          border: 1px solid #27272a;
+          border-radius: 1rem;
+          padding: 1.25rem;
+          margin-top: 1.5rem;
+          margin-bottom: 1.5rem;
+          max-width: 100%;
+        }
+        .quiz-question {
+          font-weight: 700;
+          color: #ffffff;
+          margin-bottom: 1rem;
+          font-size: 14px;
+        }
+        .quiz-option {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.75rem 1rem;
+          border: 1px solid #27272a;
+          border-radius: 0.75rem;
+          margin-bottom: 0.5rem;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .quiz-option:hover {
+          background: rgba(39, 39, 42, 0.4);
+        }
+        .quiz-option input {
+          cursor: pointer;
+          accent-color: #a855f7;
+        }
+        .quiz-option label {
+          cursor: pointer;
+          font-size: 13px;
+          color: #d1d5db;
+          margin: 0;
+          width: 100%;
+        }
+        .quiz-check-btn {
+          background: #27272a;
+          color: #ffffff;
+          font-size: 12px;
+          font-weight: 600;
+          padding: 0.5rem 1rem;
+          border-radius: 0.5rem;
+          border: 1px solid #3f3f46;
+          cursor: pointer;
+          transition: all 0.2s;
+          margin-top: 0.5rem;
+        }
+        .quiz-check-btn:hover {
+          background: #3f3f46;
+        }
         .custom-scrollbar::-webkit-scrollbar {
           width: 5px;
           height: 5px;

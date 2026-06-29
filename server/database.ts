@@ -3736,6 +3736,287 @@ function mapUser(row: Row): UserRecord {
   }
 }
 
+const predefinedLessonsContent: Record<string, string> = {
+  "1.1 Що таке програмування та мови розробки": `
+    <div class="lesson-section">
+      <p>Привіт, друже! Вітаємо з початком блоку Python. На цьому тижні маємо багато цікавого для тебе.</p>
+      
+      <h3>Цілі Модуля 1:</h3>
+      <ul>
+        <li>вивчити базові поняття програмування: інструкція, код, алгоритми, трансляція коду;</li>
+        <li>дізнатися переваги та сфери використання мови Python;</li>
+        <li>встановити інтерпретатор Python та налаштувати робоче оточення VS Code;</li>
+        <li>навчитись працювати в інтерактивному REPL консолі;</li>
+        <li>створити та запустити свій перший Python-скрипт main.py.</li>
+      </ul>
+      
+      <h3>Що таке програмування?</h3>
+      <p>Програмування — це процес створення інструкцій для комп'ютера, які він може зрозуміти та виконати. Комп'ютери насправді досить обмежені: вони не вміють думати самостійно і лише чітко виконують команди, які ми їм даємо.</p>
+    </div>
+    
+    <div class="lesson-section">
+      <p><strong>Код (Code)</strong> — це набір інструкцій, написаних певною мовою програмування. Кожна мова має свій унікальний набір правил написання команд, який називається <strong>синтаксисом</strong>.</p>
+      <p><strong>Вихідний код (source code)</strong> — це текст комп'ютерної програми будь-якою мовою програмування. Він містить набір синтаксичних конструкцій, що описують набір інструкцій для комп'ютера.</p>
+      
+      <h3>Компілятори та Інтерпретатори</h3>
+      <p>Сам собою вихідний код незрозумілий для машини. Є крок, що виконується після написання програми, який конвертує вихідний код у набір інструкцій, зрозумілих комп'ютеру. Цим займається спеціальна програма: компілятор або інтерпретатор.</p>
+      <p>Python є <strong>інтерпретованою</strong> мовою. Спеціальна програма — <strong>інтерпретатор</strong> — перекладає код Python на машинну мову крок за кроком під час виконання програми.</p>
+    </div>
+
+    <div class="lesson-section">
+      <h3>Що таке алгоритм?</h3>
+      <p><strong>Алгоритм</strong> — це послідовність чітких кроків для досягнення певної мети. Приготування кави, складання меблів за інструкцією або чищення зубів — це все алгоритми з нашого життя.</p>
+      
+      <div class="quiz-container" data-correct-index="1" data-explanation="Правильна відповідь! Алгоритм — це чітка послідовність кроків для вирішення завдання або досягнення мети.">
+        <p class="quiz-question">Перевірка знань: Що таке алгоритм у програмуванні?</p>
+        <div class="quiz-option" data-index="0">
+          <input type="radio" name="q1.1" id="q1.1_o0" />
+          <label for="q1.1_o0">Будь-яка програма, яка відкриває файли на комп'ютері.</label>
+        </div>
+        <div class="quiz-option" data-index="1">
+          <input type="radio" name="q1.1" id="q1.1_o1" />
+          <label for="q1.1_o1">Послідовність чітких кроків (інструкцій) для досягнення певної мети.</label>
+        </div>
+        <div class="quiz-option" data-index="2">
+          <input type="radio" name="q1.1" id="q1.1_o2" />
+          <label for="q1.1_o2">Сама мова програмування Python.</label>
+        </div>
+        <button class="quiz-check-btn">Перевірити</button>
+        <div class="quiz-feedback" style="display:none">
+          <p class="quiz-feedback-text"></p>
+        </div>
+      </div>
+    </div>
+  `,
+
+  "1.2 Чому варто обрати Python": `
+    <div class="lesson-section">
+      <p><strong>Python</strong> — одна з найпопулярніших і найдоступніших мов програмування у світі. Її було створено Гвідо ван Россумом наприкінці 80-х років з фокусом на читабельність коду.</p>
+      
+      <h3>Основні переваги Python:</h3>
+      <ul>
+        <li><strong>Простий та чистий синтаксис:</strong> Код виглядає майже як звичайна англійська мова. Менше дужок та розділових знаків у порівнянні з іншими мовами.</li>
+        <li><strong>Універсальність:</strong> Python використовується скрізь: розробка вебсайтів (Django, FastAPI), штучний інтелект та машинне навчання, аналіз даних (Data Science), автоматизація рутинних завдань.</li>
+        <li><strong>Величезна спільнота:</strong> Завжди можна знайти готове рішення або отримати допомогу.</li>
+      </ul>
+    </div>
+
+    <div class="lesson-section">
+      <h3>Порівняння синтаксису (вивід тексту):</h3>
+      <p><strong>Код на Java:</strong></p>
+      <pre><code>public class Main {
+    public static void main(String[] args) {
+        System.out.println("Hello, World!");
+    }
+}</code></pre>
+      <p><strong>Код на Python:</strong></p>
+      <pre><code>print("Hello, World!")</code></pre>
+    </div>
+
+    <div class="lesson-section">
+      <div class="quiz-container" data-correct-index="1" data-explanation="Правильна відповідь! Простий синтаксис та фокус на читанні коду роблять Python ідеальним стартом.">
+        <p class="quiz-question">Перевірка знань: Що є основною філософією мови Python?</p>
+        <div class="quiz-option" data-index="0">
+          <input type="radio" name="q1.2" id="q1.2_o0" />
+          <label for="q1.2_o0">Код має виконуватися якомога швидше, навіть якщо він незрозумілий.</label>
+        </div>
+        <div class="quiz-option" data-index="1">
+          <input type="radio" name="q1.2" id="q1.2_o1" />
+          <label for="q1.2_o1">Читабельність та простота коду мають першочергове значення.</label>
+        </div>
+        <div class="quiz-option" data-index="2">
+          <input type="radio" name="q1.2" id="q1.2_o2" />
+          <label for="q1.2_o2">Вона розроблена суто для створення мобільних ігор.</label>
+        </div>
+        <button class="quiz-check-btn">Перевірити</button>
+        <div class="quiz-feedback" style="display:none">
+          <p class="quiz-feedback-text"></p>
+        </div>
+      </div>
+    </div>
+  `,
+
+  "1.3 Встановлення інтерпретатора Python": `
+    <div class="lesson-section">
+      <p>Для того, щоб запускати Python-команди на вашому комп'ютері, необхідно встановити сам інтерпретатор.</p>
+      
+      <h3>Кроки з встановлення:</h3>
+      <ol>
+        <li>Перейдіть на офіційний сайт <a href="https://www.python.org/downloads/" target="_blank" style="color:#c084fc">python.org/downloads/</a>.</li>
+        <li>Завантажте останню версію для вашої операційної системи (Windows / macOS / Linux).</li>
+      </ol>
+    </div>
+
+    <div class="lesson-section">
+      <p><strong>Важливо для Windows:</strong> При запуску інсталятора обов'язково поставте галочку біля пункту <strong>"Add python.exe to PATH"</strong> на першому ж екрані! Це дозволить запускати Python з будь-якого вікна командного рядка.</p>
+      <p>Натисніть <strong>Install Now</strong> та дочекайтеся завершення.</p>
+    </div>
+
+    <div class="lesson-section">
+      <h3>Перевірка встановлення:</h3>
+      <p>Відкрийте Термінал (macOS/Linux) або Командний рядок/PowerShell (Windows) та введіть команду:</p>
+      <pre><code>python --version</code></pre>
+      <p>Якщо ви бачите щось на кшталт <code>Python 3.12.x</code>, вітаємо — встановлення пройшло успішно!</p>
+    </div>
+  `,
+
+  "1.4 Робота з інтерактивним REPL": `
+    <div class="lesson-section">
+      <p><strong>REPL</strong> (Read-Eval-Print Loop) — це інтерактивний режим, де ви вводите команду Python, інтерпретатор одразу її виконує та виводить результат на екран.</p>
+      
+      <h3>Як запустити REPL:</h3>
+      <p>Відкрийте термінал та введіть просто:</p>
+      <pre><code>python</code></pre>
+      <p>Термінал зміниться і з'явиться три стрілочки <code>&gt;&gt;&gt;</code>. Це означає, що ви всередині інтерактивної консолі Python.</p>
+    </div>
+
+    <div class="lesson-section">
+      <h3>Приклад роботи в REPL:</h3>
+      <pre><code>&gt;&gt;&gt; 2 + 3
+5
+&gt;&gt;&gt; print("Привіт з консолі!")
+Привіт з консолі!</code></pre>
+      
+      <p>Щоб вийти з REPL, введіть команду:</p>
+      <pre><code>exit()</code></pre>
+    </div>
+
+    <div class="lesson-section">
+      <div class="quiz-container" data-correct-index="1" data-explanation="Правильна відповідь! Для виходу з консолі REPL використовується функція exit() або комбінація Ctrl+Z на Windows.">
+        <p class="quiz-question">Перевірка знань: Якою командою вийти з інтерактивного режиму Python (REPL)?</p>
+        <div class="quiz-option" data-index="0">
+          <input type="radio" name="q1.4" id="q1.4_o0" />
+          <label for="q1.4_o0">quit</label>
+        </div>
+        <div class="quiz-option" data-index="1">
+          <input type="radio" name="q1.4" id="q1.4_o1" />
+          <label for="q1.4_o1">exit()</label>
+        </div>
+        <div class="quiz-option" data-index="2">
+          <input type="radio" name="q1.4" id="q1.4_o2" />
+          <label for="q1.4_o2">close</label>
+        </div>
+        <button class="quiz-check-btn">Перевірити</button>
+        <div class="quiz-feedback" style="display:none">
+          <p class="quiz-feedback-text"></p>
+        </div>
+      </div>
+    </div>
+  `,
+
+  "1.5 Що таке середовище розробки IDE": `
+    <div class="lesson-section">
+      <p>Писати великі програми в інтерактивному REPL або у звичайному Блокноті незручно. Для цього розробники використовують спеціальні середовища.</p>
+      
+      <h3>Текстовий редактор проти IDE:</h3>
+      <ul>
+        <li><strong>Прості редактори:</strong> Звичайні текстові файли без підсвічування коду (наприклад, Блокнот).</li>
+        <li><strong>IDE / Сучасні редактори коду:</strong> Програми, які підсвічують синтаксис, автодоповнюють слова, знаходять помилки під час написання та дозволяють запускати код безпосередньо в програмі.</li>
+      </ul>
+    </div>
+
+    <div class="lesson-section">
+      <p>Наш вибір — <strong>Visual Studio Code (VS Code)</strong> від компанії Microsoft. Він безкоштовний, працює швидко та підтримує безліч плагінів для розробки.</p>
+    </div>
+  `,
+
+  "1.6 Встановлення та налаштування VS Code": `
+    <div class="lesson-section">
+      <p>Давайте встановимо робоче середовище для розробки на Python.</p>
+      
+      <h3>Кроки з встановлення VS Code:</h3>
+      <ol>
+        <li>Завантажте інсталятор з сайту <a href="https://code.visualstudio.com/" target="_blank" style="color:#c084fc">code.visualstudio.com</a>.</li>
+        <li>Встановіть програму, дотримуючись підказок.</li>
+      </ol>
+    </div>
+
+    <div class="lesson-section">
+      <h3>Підготовка робочої папки:</h3>
+      <ol>
+        <li>Створіть на комп'ютері окрему папку для вашого навчання, наприклад, <code>NoteHubPython</code>.</li>
+        <li>Запустіть VS Code.</li>
+        <li>Оберіть у меню <strong>File -&gt; Open Folder</strong> та вкажіть створену папку. Це буде ваша робоча область (workspace).</li>
+      </ol>
+    </div>
+  `,
+
+  "1.7 Встановлення плагінів для розробки": `
+    <div class="lesson-section">
+      <p>VS Code за замовчуванням не знає специфіки мови Python. Нам потрібно додати офіційне розширення.</p>
+      
+      <h3>Як встановити розширення:</h3>
+      <ol>
+        <li>Зліва на панелі VS Code знайдіть іконку з чотирма квадратиками (Extensions) або натисніть <code>Ctrl + Shift + X</code>.</li>
+        <li>У полі пошуку введіть: <strong>Python</strong>.</li>
+        <li>Оберіть плагін від компанії <strong>Microsoft</strong> та натисніть синю кнопку <strong>Install</strong>.</li>
+      </ol>
+    </div>
+
+    <div class="lesson-section">
+      <p>Це розширення додасть підсвітку коду, інтелектуальне автодоповнення (IntelliSense) та спростить запуск і налагодження програм.</p>
+    </div>
+  `,
+
+  "1.8 Створення першого файлу main.py": `
+    <div class="lesson-section">
+      <p>Тепер ви готові написати та зберегти свою першу комп'ютерну програму!</p>
+      
+      <h3>Кроки для створення файлу:</h3>
+      <ol>
+        <li>У панелі провідника VS Code (Explorer) натисніть іконку файлу з плюсом або оберіть <strong>File -&gt; New File</strong>.</li>
+        <li>Назвіть файл <strong>main.py</strong> (розширення <code>.py</code> вказує комп'ютеру, що це скрипт на мові Python).</li>
+      </ol>
+    </div>
+
+    <div class="lesson-section">
+      <p>Введіть наступний код у файл:</p>
+      <pre><code>print("Hello, NoteHub Study!")</code></pre>
+      
+      <p>Збережіть файл, натиснувши комбінацію клавіш <code>Ctrl + S</code> (або <code>Cmd + S</code> на macOS).</p>
+    </div>
+  `,
+
+  "1.9 Запуск коду та перші кроки в терміналі": `
+    <div class="lesson-section">
+      <p>Залишився останній крок — запустити створену програму!</p>
+      
+      <h3>Як запустити скрипт у VS Code:</h3>
+      <ol>
+        <li>Відкрийте вбудований термінал VS Code через меню <strong>Terminal -&gt; New Terminal</strong>.</li>
+        <li>У терміналі введіть команду для запуску:</li>
+      </ol>
+      <pre><code>python main.py</code></pre>
+    </div>
+
+    <div class="lesson-section">
+      <p>Натисніть Enter. Нижче з'явиться вивід вашої програми: <code>Hello, NoteHub Study!</code></p>
+    </div>
+
+    <div class="lesson-section">
+      <div class="quiz-container" data-correct-index="1" data-explanation="Правильна відповідь! Для запуску файлу main.py через інтерпретатор Python у терміналі використовується команда python main.py.">
+        <p class="quiz-question">Перевірка знань: За допомогою якої команди запускають скрипти в терміналі?</p>
+        <div class="quiz-option" data-index="0">
+          <input type="radio" name="q1.9" id="q1.9_o0" />
+          <label for="q1.9_o0">run main.py</label>
+        </div>
+        <div class="quiz-option" data-index="1">
+          <input type="radio" name="q1.9" id="q1.9_o1" />
+          <label for="q1.9_o1">python main.py</label>
+        </div>
+        <div class="quiz-option" data-index="2">
+          <input type="radio" name="q1.9" id="q1.9_o2" />
+          <label for="q1.9_o2">start python main.py</label>
+        </div>
+        <button class="quiz-check-btn">Перевірити</button>
+        <div class="quiz-feedback" style="display:none">
+          <p class="quiz-feedback-text"></p>
+        </div>
+      </div>
+    </div>
+  `
+};
+
 function seedStudyContent() {
   console.log('Seeding NoteHub Study content (Python Developer only)...')
   
@@ -4102,7 +4383,10 @@ function seedStudyContent() {
     // Seed lessons/trainings
     let orderIndex = 0
     for (const lessonTitle of m.lessons) {
-      const lessonContent = "<h2>" + lessonTitle + "</h2><p>У цьому розділі ми детально розберемо тему \"<strong>" + lessonTitle + "</strong>\".</p><p>Вивчіть синтаксичні конструкції та запустіть відповідний код у редакторі праворуч.</p>"
+      let lessonContent = "<h2>" + lessonTitle + "</h2><p>У цьому розділі ми детально розберемо тему \"<strong>" + lessonTitle + "</strong>\".</p><p>Вивчіть синтаксичні конструкції та запустіть відповідний код у редакторі праворуч.</p>"
+      if (predefinedLessonsContent[lessonTitle]) {
+        lessonContent = predefinedLessonsContent[lessonTitle]
+      }
       insertLesson.run([globalLessonId++, moduleId, lessonTitle, 'training', lessonContent, orderIndex++])
     }
     
