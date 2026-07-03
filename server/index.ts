@@ -454,7 +454,7 @@ const distDir = path.join(process.cwd(), 'dist')
 if (fs.existsSync(distDir)) {
   console.log(`Serving static files from: ${distDir}`)
   app.use(express.static(distDir))
-  app.get('*', (req, res, next) => {
+  app.use((req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
       return next()
     }

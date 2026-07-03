@@ -249,12 +249,31 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   if (response.status === 204) {
     return undefined as T
   }
-  const payload = (await response.json()) as unknown
+
+  let payload: any = null
+  const contentType = response.headers.get('content-type')
+  if (contentType && contentType.includes('application/json')) {
+    try {
+      payload = await response.json()
+    } catch (e) {
+      // Ignored
+    }
+  } else {
+    try {
+      const text = await response.text()
+      if (text) {
+        payload = JSON.parse(text)
+      }
+    } catch (e) {
+      // Ignored
+    }
+  }
+
   if (!response.ok) {
     const message =
       payload && typeof payload === 'object' && 'error' in payload
         ? String(payload.error)
-        : 'Request failed'
+        : `Запит відхилено з кодом: ${response.status}`
     throw new Error(message)
   }
   return payload as T
