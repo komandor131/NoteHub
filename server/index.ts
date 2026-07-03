@@ -449,6 +449,19 @@ app.post('/api/study/time', authMiddleware, (req, res) => {
   }
 })
 
+// Serve static assets in production if built
+const distDir = path.join(process.cwd(), 'dist')
+if (fs.existsSync(distDir)) {
+  console.log(`Serving static files from: ${distDir}`)
+  app.use(express.static(distDir))
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+      return next()
+    }
+    res.sendFile(path.join(distDir, 'index.html'))
+  })
+}
+
 app.listen(port, () => {
   console.log(`NoteHub API listening on http://localhost:${port}`)
 })

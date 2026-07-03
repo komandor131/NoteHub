@@ -64,6 +64,19 @@ export default function ProjectDrawer({
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
+    
+    // Validate repository URL
+    if (repoUrl && !repoUrl.startsWith('http://') && !repoUrl.startsWith('https://') && !repoUrl.startsWith('git@') && !repoUrl.startsWith('git://')) {
+      alert('Будь ласка, введіть коректну URL-адресу для репозиторію (починаючи з https:// або http://). Якщо ви хочете додати посилання на Figma чи інші документи, скористайтеся розділом "Додаткові корисні посилання" нижче.')
+      return
+    }
+    
+    // Validate deployment URL
+    if (prodUrl && !prodUrl.startsWith('http://') && !prodUrl.startsWith('https://')) {
+      alert('Будь ласка, введіть коректну URL-адресу деплою (починаючи з https:// або http://).')
+      return
+    }
+
     const techStack = techStackText
       .split(',')
       .map((t) => t.trim())
@@ -119,7 +132,7 @@ export default function ProjectDrawer({
           </label>
 
           <label>
-            <span>Репозиторій (Git)</span>
+            <span>URL-адреса репозиторію (GitHub/GitLab)</span>
             <input
               value={repoUrl}
               onChange={(e) => setRepoUrl(e.target.value)}
@@ -128,7 +141,7 @@ export default function ProjectDrawer({
           </label>
 
           <label>
-            <span>Посилання на деплой</span>
+            <span>URL-адреса деплою (Vercel/Netlify)</span>
             <input
               value={prodUrl}
               onChange={(e) => setProdUrl(e.target.value)}

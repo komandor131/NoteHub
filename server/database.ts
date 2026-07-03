@@ -3022,7 +3022,7 @@ function lastInsertId() {
   return row?.id ?? 0
 }
 
-function persist() {
+export function persist() {
   const data = ensureDb().export()
   fs.writeFileSync(dbPath, Buffer.from(data))
 }

@@ -31,7 +31,16 @@ import styles from './ProjectsPanel.module.css'
 
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
-type SnippetSelection = number | 'new' | null
+const getLinkIcon = (name: string) => {
+  const n = name.toLowerCase();
+  if (n.includes('figma') || n.includes('фігма') || n.includes('дизайн') || n.includes('макет')) return '🎨';
+  if (n.includes('тз') || n.includes('завдання') || n.includes('документ') || n.includes('docs') || n.includes('doc') || n.includes('requirements')) return '📄';
+  if (n.includes('спредшит') || n.includes('таблиц') || n.includes('sheet') || n.includes('excel')) return '📊';
+  if (n.includes('trello') || n.includes('jira') || n.includes('дошка') || n.includes('board')) return '📋';
+  if (n.includes('репозиторій') || n.includes('repo') || n.includes('git') || n.includes('github') || n.includes('gitlab')) return '🐙';
+  if (n.includes('деплой') || n.includes('deploy') || n.includes('продакшн') || n.includes('production') || n.includes('сайт')) return '🚀';
+  return '🔗';
+};
 
 export default function ProjectsPanel({
   projects,
@@ -742,7 +751,7 @@ export default function ProjectsPanel({
                 {project.links.map((link, idx) => (
                   <div className="project-link-item" key={idx}>
                     <a href={link.url} target="_blank" rel="noreferrer" style={{ fontSize: '12.5px' }}>
-                      🔗 {link.name}
+                      {getLinkIcon(link.name)} {link.name}
                     </a>
                     <ExternalLink size={12} className="muted" />
                   </div>
