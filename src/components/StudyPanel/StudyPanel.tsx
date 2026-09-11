@@ -687,7 +687,7 @@ export default function StudyPanel({ onExit }: { onExit: () => void }) {
                     {/* Purple SVG Cosmic Kitty */}
                     <svg viewBox="0 0 100 100" className="w-24 h-24">
                       {/* Tail */}
-                      <path d="M75,55 C85,55 90,45 85,38 C80,31 73,38 73,45" fill="none" stroke="#a855f7" strokeWidth="6" strokeLinecap="round" />
+                      <path className="cat-tail" d="M75,55 C85,55 90,45 85,38 C80,31 73,38 73,45" fill="none" stroke="#a855f7" strokeWidth="6" strokeLinecap="round" />
                       {/* Body */}
                       <ellipse cx="50" cy="55" rx="25" ry="18" fill="#a855f7" />
                       <ellipse cx="50" cy="55" rx="15" ry="10" fill="#8b5cf6" />
@@ -902,8 +902,15 @@ export default function StudyPanel({ onExit }: { onExit: () => void }) {
                         )}
                       </button>
 
-                      {isExpanded && !isCollapsed && (
-                        <div className="p-2.5 bg-[#18181b] space-y-2">
+                      <div
+                        className="transition-all duration-300 ease-in-out overflow-hidden"
+                        style={{
+                          maxHeight: isExpanded && !isCollapsed ? '1000px' : '0px',
+                          opacity: isExpanded && !isCollapsed ? 1 : 0,
+                          pointerEvents: isExpanded && !isCollapsed ? 'auto' : 'none'
+                        }}
+                      >
+                        <div className="p-2.5 bg-[#18181b] space-y-2 border-t border-[#27272a]">
                           {/* Training dropdown section */}
                           {trainings.length > 0 && (() => {
                             const secKey = `${mod.id}-trainings`
@@ -962,7 +969,7 @@ export default function StudyPanel({ onExit }: { onExit: () => void }) {
                             )
                           })}
                         </div>
-                      )}
+                      </div>
                     </div>
                   )
                 })}

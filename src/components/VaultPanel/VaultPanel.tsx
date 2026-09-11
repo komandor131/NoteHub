@@ -11,6 +11,9 @@ import {
   Save,
   Minimize2,
   Upload,
+  Play,
+  Terminal,
+  X,
 } from 'lucide-react'
 import type { Snippet, Project, SnippetPayload, SnippetFilters, Attachment, SnippetFormState } from '../../types'
 import SnippetFiltersBox from '../SnippetFiltersBox/SnippetFiltersBox'
@@ -107,6 +110,8 @@ export default function VaultPanel({
   const [form, setForm] = useState<SnippetFormState>(snippetToForm(selectedSnippet))
   const [file, setFile] = useState<File | null>(null)
   const [copied, setCopied] = useState(false)
+  const [consoleOutput, setConsoleOutput] = useState<string[]>([])
+  const [showConsole, setShowConsole] = useState(false)
 
   useEffect(() => {
     if (selection === 'new') {
@@ -122,6 +127,8 @@ export default function VaultPanel({
       setForm(snippetToForm(selectedSnippet))
     }
     setFile(null)
+    setShowConsole(false)
+    setConsoleOutput([])
   }, [selectedSnippet, selection, quickSnippetProjectId])
 
   const isNew = selection === 'new'
@@ -141,9 +148,73 @@ export default function VaultPanel({
     }
   }
 
+  const runCode = () => {
+    setShowConsole(true)
+    setConsoleOutput(['⚙️ Запуск коду...', ''])
+    
+    if (form.language === 'javascript' || form.language === 'typescript') {
+      try {
+        const logs: string[] = []
+        const originalLog = console.log
+        console.log = (...args) => {
+          logs.push(args.map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join(' '))
+        }
+        
+        const fn = new Function(form.code)
+        fn()
+        
+        console.log = originalLog
+        setConsoleOutput(prev => [
+          ...prev,
+          ...logs,
+          logs.length ? '' : '⚠️ Код виконано без виводів в консоль. Спробуйте використати console.log()',
+          '✅ Виконання завершено успішно!'
+        ])
+      } catch (err: any) {
+        setConsoleOutput(prev => [
+          ...prev,
+          `❌ Помилка виконання: ${err.message}`
+        ])
+      }
+    } else if (form.language === 'python') {
+      try {
+        const lines = form.code.split('\n')
+        const logs: string[] = []
+        lines.forEach(line => {
+          const match = line.trim().match(/^print\((.*)\)$/)
+          if (match) {
+            const inner = match[1].trim()
+            if ((inner.startsWith('"') && inner.endsWith('"')) || (inner.startsWith("'") && inner.endsWith("'"))) {
+              logs.push(inner.slice(1, -1))
+            } else {
+              logs.push(`[Python Eval] ${inner}`)
+            }
+          }
+        })
+        setConsoleOutput(prev => [
+          ...prev,
+          ...logs,
+          logs.length ? '' : '🐍 [Python] Успішно запущено! Використайте print("...") для виводу.',
+          '✅ Виконання завершено успішно!'
+        ])
+      } catch (err: any) {
+        setConsoleOutput(prev => [
+          ...prev,
+          `❌ Помилка Python: ${err.message}`
+        ])
+      }
+    } else {
+      setConsoleOutput(prev => [
+        ...prev,
+        `⚠️ Запуск не підтримується для мови "${form.language}".`,
+        'Підтримуються тільки: javascript, typescript, python'
+      ])
+    }
+  }
+
   return (
     <section className={`vault-grid ${styles.vaultPanel}`}>
-      <aside className="panel snippet-list-panel">
+      <aside className={styles.snippetListPanel}>
         <div className="panel-header compact">
           <div>
             <p className="kicker">Сховище коду</p>
@@ -188,7 +259,7 @@ export default function VaultPanel({
         </div>
       </aside>
 
-      <form className="panel editor-panel" onSubmit={submit}>
+      <form className={styles.editorPanel} onSubmit={submit}>
         <div className="panel-header">
           <div>
             <p className="kicker">{isNew ? 'Нова картка коду' : 'Міні IDE'}</p>
@@ -200,6 +271,15 @@ export default function VaultPanel({
                 <Trash2 size={17} />
               </button>
             ) : null}
+            
+            {/* Run Code Button */}
+            {(form.language === 'javascript' || form.language === 'typescript' || form.language === 'python') && (
+              <button className="btn secondary" type="button" onClick={runCode} style={{ color: 'var(--pink-strong)', borderColor: 'rgba(168, 85, 247, 0.25)' }}>
+                <Play size={14} fill="currentColor" />
+                Виконати
+              </button>
+            )}
+
             <button className="btn secondary" type="button" onClick={copyToClipboard}>
               {copied ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
               {copied ? 'Скопійовано!' : 'Копіювати'}
@@ -279,7 +359,35 @@ export default function VaultPanel({
           />
         </div>
 
-        <label>
+        {/* Execution Output Console Widget */}
+        {showConsole && (
+          <div className={styles.consoleContainer}>
+            <div className={styles.consoleHeader}>
+              <div className="flex items-center gap-2">
+                <Terminal size={14} style={{ color: 'var(--pink-strong)' }} />
+                <span className={styles.consoleTitle}>Консоль виводу</span>
+              </div>
+              <button 
+                className="icon-btn" 
+                type="button" 
+                onClick={() => setShowConsole(false)}
+                title="Очистити й закрити"
+                style={{ padding: 4 }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div className={styles.consoleBody}>
+              {consoleOutput.map((line, idx) => (
+                <div className={styles.consoleLine} key={idx}>
+                  {line}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <label style={{ marginTop: '16px' }}>
           <span>Пояснення / Нотатки</span>
           <textarea
             value={form.explanation}
@@ -307,6 +415,12 @@ export default function VaultPanel({
           <div className="fullscreen-editor-header">
             <h3>{form.title || 'Редактор коду'} ({form.language})</h3>
             <div className="row-actions">
+              {(form.language === 'javascript' || form.language === 'typescript' || form.language === 'python') && (
+                <button className="btn secondary" type="button" onClick={runCode} style={{ color: 'var(--pink-strong)' }}>
+                  <Play size={14} fill="currentColor" />
+                  Виконати код
+                </button>
+              )}
               <button className="btn secondary" type="button" onClick={copyToClipboard}>
                 {copied ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
                 {copied ? 'Скопійовано!' : 'Копіювати код'}

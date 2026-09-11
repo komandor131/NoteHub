@@ -49,6 +49,7 @@ export interface TasksPanelProps {
   onEditTask: (task: Task) => void
   onDeleteTask: (task: Task) => Promise<void>
   onDeleteAttachment: (attachment: Attachment) => Promise<void>
+  onUpdateTask: (id: number, payload: TaskPayload) => Promise<void>
 }
 
 // 3. VaultPanel
@@ -80,12 +81,13 @@ export interface ProjectsPanelProps {
   onSelectProject: (id: number | null) => void
   onCreateProject: () => void
   onEditProject: (project: Project) => void
-  onDeleteProject: (project: Project) => Promise<void>
+  onDeleteProject: (project: Project, bypassConfirm?: boolean) => Promise<void>
   onDeleteAttachment: (attachment: Attachment) => Promise<void>
   onQuickCreateTask: (projectId: number) => void
   onQuickCreateSnippet: (projectId: number) => void
   onSaveCanvas: (id: number, canvasData: string) => Promise<void>
   onUpdateTask: (id: number, payload: TaskPayload) => Promise<void>
+  onDeleteTask?: (task: Task, bypassConfirm?: boolean) => Promise<void>
   setSection: (section: Section) => void
   setSnippetSelection: (selection: number | 'new' | null) => void
   openEditTask: (task: Task) => void
@@ -118,6 +120,10 @@ export interface RoadmapsPanelProps {
   onEditRoadmap: (roadmap: Roadmap) => void
   onDeleteRoadmap: (roadmap: Roadmap) => Promise<void>
   onSaveCanvas: (id: number, canvasData: string) => Promise<void>
+  mindMaps?: any[]
+  onSelectMindMap?: (id: number | null) => void
+  setSection?: (section: any) => void
+  onRefreshData?: () => Promise<void>
 }
 
 // 7. FinancePanel

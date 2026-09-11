@@ -14,9 +14,12 @@ import {
   GitBranch,
 } from 'lucide-react'
 import type { Roadmap, RoadmapPayload, RoadmapsPanelProps } from '../../types'
+import { fetchMindMaps } from '../../api'
 import { getConnectionPoints, getBezierPath } from '../../canvasUtils'
 import MathContent from '../MathContent/MathContent'
 import styles from './RoadmapsPanel.module.css'
+import { useConfirm } from '../../context/ConfirmContext'
+import TopicLectureView from '../Study/TopicLectureView'
 
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
@@ -28,8 +31,13 @@ export default function RoadmapsPanel({
   onEditRoadmap,
   onDeleteRoadmap,
   onSaveCanvas,
+  mindMaps,
+  onSelectMindMap,
+  setSection,
+  onRefreshData,
 }: RoadmapsPanelProps) {
   const roadmap = roadmaps.find((r) => r.id === selectedRoadmapId) ?? null
+  const confirm = useConfirm()
 
   const [nodes, setNodes] = useState<Array<{
     id: string
@@ -44,40 +52,50 @@ export default function RoadmapsPanel({
   }>>([])
   const [edges, setEdges] = useState<Array<{ from: string; to: string }>>([])
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [activeNotes, setActiveNotes] = useState<string | null>(null)
-  const [activeNotesTitle, setActiveNotesTitle] = useState<string>('')
-  const [isLoadingNotes, setIsLoadingNotes] = useState(false)
+
+  // Full-page LMS lecture route state (up to theme 1.2 in math)
+  const [activeLectureNodeId, setActiveLectureNodeId] = useState<string | null>(null)
+
+  // Synchronize hash routing: #/roadmap/:roadmapId/lecture/:nodeId
+  useEffect(() => {
+    const parseHash = () => {
+      const hash = window.location.hash
+      const match = hash.match(/^#\/roadmap\/(\d+)\/lecture\/([a-zA-Z0-9_-]+)/)
+      if (match) {
+        const rId = Number(match[1])
+        const nId = match[2]
+        if (selectedRoadmapId !== rId) {
+          onSelectRoadmap(rId)
+        }
+        setActiveLectureNodeId(nId)
+        setSelectedNodeId(nId)
+      } else if (!hash || !hash.includes('/lecture/')) {
+        setActiveLectureNodeId(null)
+      }
+    }
+
+    parseHash()
+    window.addEventListener('hashchange', parseHash)
+    return () => window.removeEventListener('hashchange', parseHash)
+  }, [selectedRoadmapId, onSelectRoadmap])
+
+  const handleOpenFullLecture = (nodeId: string) => {
+    if (!roadmap) return
+    setActiveLectureNodeId(nodeId)
+    setSelectedNodeId(nodeId)
+    window.location.hash = `#/roadmap/${roadmap.id}/lecture/${nodeId}`
+  }
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsFullscreen(false)
-        setActiveNotes(null)
+        setActiveLectureNodeId(null)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
-
-  const handleOpenNotes = async (nodeId: string) => {
-    const node = nodes.find((n) => n.id === nodeId)
-    if (!node) return
-    setActiveNotesTitle(node.title || 'Конспект')
-    setIsLoadingNotes(true)
-    try {
-      const res = await fetch(`${API_BASE}/api/roadmaps/notes/${nodeId}`)
-      const data = await res.json()
-      if (data && data.notes) {
-        setActiveNotes(data.notes)
-      } else {
-        setActiveNotes('Для цього кроку конспект ще не створено.')
-      }
-    } catch (err) {
-      setActiveNotes('Помилка завантаження конспекту. Перевірте з\'єднання з сервером.')
-    } finally {
-      setIsLoadingNotes(false)
-    }
-  }
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
@@ -326,6 +344,41 @@ export default function RoadmapsPanel({
     return list
   }, [edges, nodes, selectedNodeId])
 
+  if (roadmap && activeLectureNodeId) {
+    const activeNode = nodes.find((n) => n.id === activeLectureNodeId) || {
+      id: activeLectureNodeId,
+      title: 'Конспект теми',
+      x: 0,
+      y: 0,
+      isCompleted: false
+    }
+
+    return (
+      <div className={styles.roadmapsPanel} style={{ minHeight: '100vh', background: '#0d0d11' }}>
+        <TopicLectureView
+          roadmapId={roadmap.id}
+          roadmapTitle={roadmap.title}
+          nodeId={activeLectureNodeId}
+          nodeTitle={activeNode.title || 'Конспект теми'}
+          allNodes={nodes}
+          isCompleted={!!activeNode.isCompleted}
+          onBack={() => {
+            setActiveLectureNodeId(null)
+            window.location.hash = ''
+          }}
+          onNavigateTopic={(newNodeId) => {
+            setActiveLectureNodeId(newNodeId)
+            setSelectedNodeId(newNodeId)
+            window.location.hash = `#/roadmap/${roadmap.id}/lecture/${newNodeId}`
+          }}
+          onToggleCompleted={(id) => {
+            handleToggleNodeCompleted(id)
+          }}
+        />
+      </div>
+    )
+  }
+
   if (!roadmap) {
     return (
       <div className={`projects-grid-wrapper ${styles.roadmapsPanel}`}>
@@ -343,7 +396,11 @@ export default function RoadmapsPanel({
         </div>
 
         <div className="projects-grid">
-          {roadmaps.map((rm) => {
+          {[...roadmaps].sort((a, b) => {
+            const numA = parseInt(a.title.match(/^\d+/)?.[0] || '999', 10)
+            const numB = parseInt(b.title.match(/^\d+/)?.[0] || '999', 10)
+            return numA - numB
+          }).map((rm) => {
             let totalSteps = 0
             let completedSteps = 0
             try {
@@ -634,14 +691,19 @@ export default function RoadmapsPanel({
                 <g key={conn.id}>
                   <path
                     d={conn.path}
+                    className={conn.isSelected ? 'animated-path' : ''}
                     stroke={conn.isSelected ? 'var(--pink)' : '#3f3f46'}
                     strokeWidth={conn.isSelected ? 3 : 2}
+                    strokeDasharray={conn.isSelected ? '8' : undefined}
                     fill="none"
                     markerEnd={conn.isSelected ? 'url(#arrowhead-roadmap-selected)' : 'url(#arrowhead-roadmap)'}
                     style={{ transition: 'stroke 0.15s ease, stroke-width 0.15s ease', pointerEvents: 'stroke', cursor: 'pointer' }}
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation()
-                      if (window.confirm('Видалити зв\'язок між цими кроками?')) {
+                      if (await confirm({
+                        title: 'Видалення зв\'язку',
+                        message: 'Ви дійсно хочете видалити зв\'язок між цими кроками?',
+                      })) {
                         handleDeleteEdge(conn.from, conn.to)
                       }
                     }}
@@ -830,21 +892,49 @@ export default function RoadmapsPanel({
                         style={{ background: '#09090b', border: '1px solid var(--border)', color: '#fff', fontSize: '13px', padding: '6px 10px', width: '100%', borderRadius: '6px' }}
                       />
                     </div>
-                    {selectedNodeId && (
-                      <button
-                        type="button"
-                        className="btn primary"
-                        style={{ marginTop: '8px', minHeight: '32px', fontSize: '12.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'var(--pink)', borderColor: 'var(--pink)', color: '#fff' }}
-                        onClick={() => void handleOpenNotes(selectedNodeId)}
-                      >
-                        <BookOpen size={13} /> Читати конспект
-                      </button>
-                    )}
+                    {selectedNodeId && (() => {
+                      const isMathRoadmap = roadmap && (roadmap.id === 230 || roadmap.title.toLowerCase().includes('математика'))
+                      const isMathUpTo1_2 = isMathRoadmap && (
+                        node.id === 'math_1' || node.id.startsWith('math_1_') ||
+                        node.id === 'math_2' || node.id.startsWith('math_2_')
+                      )
+                      if (!isMathUpTo1_2) return null
+                      return (
+                        <div style={{ marginTop: '10px' }}>
+                          <button
+                            type="button"
+                            className="btn primary"
+                            style={{
+                              minHeight: '40px',
+                              fontSize: '13px',
+                              fontWeight: 800,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              background: 'linear-gradient(135deg, #10b981, #059669)',
+                              border: 'none',
+                              color: '#fff',
+                              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
+                              cursor: 'pointer',
+                              width: '100%',
+                              borderRadius: '8px'
+                            }}
+                            onClick={() => handleOpenFullLecture(node.id)}
+                          >
+                            <BookOpen size={16} /> 📖 Відкрити конспект
+                          </button>
+                        </div>
+                      )
+                    })()}
                     <button
                       className="btn secondary"
                       style={{ borderColor: 'var(--danger)', color: 'var(--danger)', marginTop: '8px', minHeight: '32px', fontSize: '12px' }}
-                      onClick={() => {
-                        if (window.confirm('Видалити цей крок з карти?')) {
+                      onClick={async () => {
+                        if (await confirm({
+                          title: 'Видалення кроку',
+                          message: 'Ви дійсно хочете видалити цей крок з карти?',
+                        })) {
                           handleDeleteNode(selectedNodeId)
                         }
                       }}
@@ -863,55 +953,6 @@ export default function RoadmapsPanel({
         </div>
       </div>
 
-      {activeNotes !== null && (
-        <div className="modal-backdrop" onClick={() => setActiveNotes(null)} style={{ zIndex: 10000 }}>
-          <div
-            className="modal-content"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: '650px',
-              maxWidth: '95vw',
-              height: '100%',
-              position: 'fixed',
-              right: 0,
-              top: 0,
-              bottom: 0,
-              borderRadius: 0,
-              margin: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              background: '#0c0c0e',
-              borderLeft: '1px solid var(--border)',
-              boxShadow: '-8px 0 32px rgba(0, 0, 0, 0.6)',
-              overflow: 'hidden'
-            }}
-          >
-            <div className="drawer-header" style={{ padding: '20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p className="kicker" style={{ margin: 0, fontSize: '11px', textTransform: 'uppercase', color: 'var(--pink)', letterSpacing: '1.2px', fontWeight: 600 }}>Навчальний конспект</p>
-                <h2 style={{ margin: '4px 0 0', fontSize: '16px', fontWeight: 600, color: '#ffffff', lineHeight: '1.4' }}>{activeNotesTitle}</h2>
-              </div>
-              <button className="icon-btn" onClick={() => setActiveNotes(null)} aria-label="Close notes" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>
-                <X size={18} />
-              </button>
-            </div>
-            <div className="drawer-body" style={{ padding: '24px 20px', flex: 1, overflowY: 'auto', background: '#09090b' }}>
-              {isLoadingNotes ? (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--muted)' }}>
-                  <span>Завантаження конспекту...</span>
-                </div>
-              ) : (
-                <MathContent content={activeNotes} />
-              )}
-            </div>
-            <div className="drawer-actions" style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', background: '#0c0c0e' }}>
-              <button className="btn secondary" style={{ width: '100%' }} onClick={() => setActiveNotes(null)}>
-                Закрити конспект
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

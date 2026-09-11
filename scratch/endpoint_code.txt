@@ -1,0 +1,343 @@
+const mathStepDetails: Record<number, {
+  topics: string[];
+  google: string[];
+  formulas: string[];
+}> = {
+  1: {
+    topics: ["Міри центральної тенденції: Середнє арифметичне, медіана, мода", "Міри розсіювання: Дисперсія, стандартне відхилення, розмах, IQR", "Форма розподілу: Асиметрія (skewness), ексцес (kurtosis)", "Візуалізація: Гістограми, Box-plots (ящик з вусами)"],
+    google: ["descriptive statistics mean median mode", "variance and standard deviation Bessel correction", "interquartile range IQR outlier detection", "skewness and kurtosis shape of distribution"],
+    formulas: ["Mean: \\bar{x} = \\frac{1}{n} \\sum x_i", "Variance: s^2 = \\frac{1}{n-1} \\sum (x_i - \\bar{x})^2", "IQR = Q_3 - Q_1"]
+  },
+  2: {
+    topics: ["Простір елементарних подій (Sample Space)", "Умовна ймовірність (Conditional Probability)", "Теорема Байєса (Bayes Theorem)", "Закон повної ймовірності", "Незалежні події"],
+    google: ["probability sample space events basics", "conditional probability formula explained", "Bayes theorem intuition and math", "law of total probability examples"],
+    formulas: ["P(A|B) = \\frac{P(B|A) P(A)}{P(B)}", "P(A \\cap B) = P(A) P(B|A)"]
+  },
+  3: {
+    topics: ["Дискретні розподіли: Бернуллі, Біноміальний, Пуассона", "Безперервні розподіли: Нормальний (Гауссів), Експоненціальний, Стьюдента (t)", "Функція розподілу (CDF) та щільність ймовірності (PDF)", "Правило трьох сигм (68-95-99.7 rule)"],
+    google: ["discrete vs continuous probability distributions", "normal distribution properties and z-score", "binomial vs poisson distribution difference", "cumulative distribution function CDF vs PDF"],
+    formulas: ["Z = \\frac{x - \\mu}{\\sigma}", "P(X = k) = \\binom{n}{k} p^k (1-p)^{n-k}"]
+  },
+  4: {
+    topics: ["Нульова та альтернативна гіпотези (H0, H1)", "Помилки першого та другого роду (Alpha, Beta)", "Статистична значущість та p-value", "Критерії: t-test (Стьюдента), Z-test, Chi-Square (хі-квадрат)"],
+    google: ["hypothesis testing null alternative hypothesis", "p-value explained intuitively", "type I and type II errors power of test", "student t test independent vs paired samples"],
+    formulas: ["t = \\frac{\\bar{x} - \\mu_0}{s / \\sqrt{n}}", "p\\text{-value} \\le \\alpha \\implies \\text{reject } H_0"]
+  },
+  5: {
+    topics: ["Векторний простір, лінійна незалежність, базис", "Операції з векторами: додавання, скалярний добуток (Dot Product)", "Норми векторів: L1 (Manhattan), L2 (Euclidean)", "Косинусна схожість (Cosine Similarity)"],
+    google: ["linear algebra vector space basis span", "dot product geometric meaning", "L1 and L2 vector norms regularization", "cosine similarity distance metric math"],
+    formulas: ["\\mathbf{u} \\cdot \\mathbf{v} = \\sum u_i v_i", "\\|\\mathbf{v}\\|_{L_2} = \\sqrt{\\sum v_i^2}", "\\cos(\\theta) = \\frac{\\mathbf{u} \\cdot \\mathbf{v}}{\\|\\mathbf{u}\\| \\|\\mathbf{v}\\|}"]
+  },
+  6: {
+    topics: ["Матричні операції: множення, транспонування, визначник (Determinant)", "Обернена матриця та системи лінійних рівнянь", "Власні значення та власні вектори (Eigenvalues & Eigenvectors)", "Сингулярний розклад (SVD) та метод головних компонент (PCA)"],
+    google: ["matrix multiplication rules properties", "determinant and matrix inverse linear transformation", "eigenvalues and eigenvectors visual intuition", "singular value decomposition SVD math PCA"],
+    formulas: ["A \\mathbf{v} = \\lambda \\mathbf{v}", "A^{-1} A = I", "A = U \\Sigma V^T"]
+  },
+  7: {
+    topics: ["Границя функції, неперервність", "Похідна як миттєва швидкість зміни", "Правила диференціювання: Chain Rule (ланцюгове правило)", "Частинні похідні та градієнт (набла) для багатовимірних функцій"],
+    google: ["calculus limit derivative definition intuition", "chain rule multivariable calculus derivative", "partial derivatives and gradient vector", "tangent line linear approximation"],
+    formulas: ["f'(x) = \\lim_{h \\to 0} \\frac{f(x+h) - f(x)}{h}", "\\nabla f(x, y) = \\begin{bmatrix} \\frac{\\partial f}{\\partial x} \\\\ \\frac{\\partial f}{\\partial y} \\end{bmatrix}"]
+  },
+  8: {
+    topics: ["Локальні екстремуми та матриця Гессе (Hessian)", "Алгоритм градієнтного спуску (Gradient Descent)", "Крок навчання (Learning Rate) та затухання градієнта", "Оптимізатори: SGD, Momentum, RMSprop, Adam"],
+    google: ["optimization critical points hessian matrix", "gradient descent update formula math", "stochastic gradient descent SGD momentum", "Adam optimizer step by step math"],
+    formulas: ["\\theta_{t+1} = \\theta_t - \\eta \\nabla L(\\theta_t)"]
+  },
+  9: {
+    topics: ["Апріорна та апостеріорна ймовірність (Prior & Posterior)", "Спряжені апріорні розподіли (Conjugate Priors)", "Метод максимальної апостеріорної оцінки (MAP)", "MCMC методи: Алгоритм Метрополіса-Гастінгса, Gibbs Sampling"],
+    google: ["bayesian inference prior likelihood posterior", "conjugate prior beta binomial model", "Markov Chain Monte Carlo MCMC metropolis hastings", "Gibbs sampling probability math"],
+    formulas: ["P(\\theta|D) \\propto P(D|\\theta) P(\\theta)"]
+  },
+  10: {
+    topics: ["Генеральна сукупність проти вибірки", "Центральна гранична теорема (CLT)", "Точкові та інтервальні оцінки", "Довірчі інтервали (Confidence Intervals) для середнього"],
+    google: ["population vs sample statistics", "central limit theorem simulation proof", "point estimation vs interval estimation", "confidence interval margin of error t score"],
+    formulas: ["\\text{CI} = \\bar{x} \\pm z^* \\frac{s}{\\sqrt{n}}"]
+  },
+  11: {
+    topics: ["Кореляційний аналіз: Pearson, Spearman, Kendall", "Коваріація як міра спільної мінливості", "Діаграма розсіювання (Scatter plot)"],
+    google: ["covariance vs correlation coefficient math", "pearson vs spearman rank correlation coefficient", "scatter plot linear relationship correlation"],
+    formulas: ["r = \\frac{\\sum (x_i - \\bar{x})(y_i - \\bar{y})}{\\sqrt{\\sum (x_i - \\bar{x})^2 \\sum (y_i - \\bar{y})^2}"]
+  },
+  12: {
+    topics: ["Однофакторний дисперсійний аналіз (One-way ANOVA)", "Двофакторний ANOVA (Two-way ANOVA)", "F-статистика та ступені свободи (degrees of freedom)", "Припущення дисперсійного аналізу"],
+    google: ["ANOVA variance partition sum of squares", "f-test degrees of freedom calculation", "one way anova vs two way anova math"],
+    formulas: ["F = \\frac{MS_{between}}{MS_{within}}"]
+  },
+  13: {
+    topics: ["Метод найменших квадратів (OLS)", "Залишкова дисперсія (Residuals)", "Коефіцієнт детермінації (R-squared / Adjusted R2)", "Проблема мультиколінеарності"],
+    google: ["ordinary least squares regression formula derivation", "r squared vs adjusted r squared explained", "residual sum of squares RSS linear regression"],
+    formulas: ["y = \\beta_0 + \\beta_1 x + \\epsilon", "R^2 = 1 - \\frac{SS_{res}}{SS_{tot}}"]
+  },
+  14: {
+    topics: ["Шеннонівська ентропія (Information Entropy)", "Розходження Кульбака-Лейблера (KL Divergence)", "Функція втрат крос-ентропії (Cross-Entropy Loss)", "Взаємна інформація (Mutual Information)"],
+    google: ["shannon entropy formula definition", "kullback leibler divergence loss function machine learning", "cross entropy loss calculation mathematical intuition"],
+    formulas: ["H(X) = -\\sum p(x_i) \\log_2 p(x_i)", "D_{KL}(P || Q) = \\sum P(x) \\log \\frac{P(x)}{Q(x)}"]
+  },
+  15: {
+    topics: ["Марковські ланцюги (Markov Chains) дискретного часу", "Матриця перехідних ймовірностей (Transition Matrix)", "Стаціонарний розподіл (Stationary Distribution)", "Поглинаючі стани"],
+    google: ["markov chain transition probability matrix", "stationary distribution eigenvector calculation", "absorbing markov chain properties math"],
+    formulas: ["\\pi P = \\pi"]
+  },
+  16: {
+    topics: ["Метод Ньютона-Рафсона для пошуку коренів", "Чисельне інтегрування: метод трапецій та Сімпсона", "Ряди Тейлора та Лорана для наближення функцій"],
+    google: ["newton raphson method optimization root finding", "taylor series expansion multivariable approximation", "numerical integration simpson rule trapezoidal"],
+    formulas: ["x_{n+1} = x_n - \\frac{f(x_n)}{f'(x_n)}"]
+  },
+  17: {
+    topics: ["Матриця суміжності та інцидентності графу", "Власні значення матриці суміжності", "Алгоритм PageRank для ранжування вузлів", "Найкоротші шляхи на грахах (Dijkstra, Bellman-Ford)"],
+    google: ["graph adjacency matrix eigenvalues page rank math", "dijkstra shortest path algorithm verification", "centrality measures degree closeness betweenness"],
+    formulas: ["PR(A) = \\frac{1-d}{N} + d \\sum \\frac{PR(T_i)}{C(T_i)}"]
+  },
+  18: {
+    topics: ["Функція правдоподібності (Likelihood function)", "Оцінка maximal-likelihood (MLE)", "Логарифмічна функція правдоподібності (Log-Likelihood)", "Інформація Фішера та нерівність Рао-Крамера"],
+    google: ["maximum likelihood estimation MLE step by step derivation", "fisher information matrix and Cramer-Rao bound", "likelihood vs probability density function"],
+    formulas: ["L(\\theta) = \\prod f(x_i | \\theta)"]
+  },
+  19: {
+    topics: ["Функція виживаності (Survival function) та функція інтенсивності (Hazard rate)", "Оцінювач Каплана-Меєра (Kaplan-Meier estimator)", "Модель пропорційних ризиків Кокса (Cox Regression)"],
+    google: ["survival function hazard rate mathematics", "kaplan meier product limit estimator derivation", "cox proportional hazards model assumptions"],
+    formulas: ["S(t) = P(T > t)", "h(t) = \\lim_{\\Delta t \\to 0} \\frac{P(t \\le T < t+\\Delta t | T \\ge t)}{\\Delta t}"]
+  },
+  20: {
+    topics: ["Випадкові блукання (Random Walk)", "Броунівський рух та Вінерівський процес", "Стохастичне числення (лема Іто)", "Моделювання методом Монте-Карло та швидкість збіжності"],
+    google: ["wiener process properties stochastic calculus", "monte carlo simulation error margin convergence rate", "itos lemma stochastic differential equations"],
+    formulas: ["dX_t = \\mu dt + \\sigma dW_t"]
+  },
+  21: {
+    topics: ["U-критерій Манна-Вітні (Mann-Whitney U)", "Критерій Вілкоксона для зв'язаних вибірок", "Тест Крускала-Волліса", "Методи ресемплінгу (Bootstrap, Jackknife)"],
+    google: ["mann whitney u test rank sum calculation", "bootstrap resampling confidence interval math", "nonparametric statistical tests hypothesis checking"],
+    formulas: ["U = n_1 n_2 + \\frac{n_1(n_1+1)}{2} - R_1"]
+  },
+  22: {
+    topics: ["Метричне та неметричне багатовимірне шкалювання (MDS)", "Матриця взаємних відстаней (Distance Matrix)", "Мінімізація стресу конфігурації (Stress minimization)"],
+    google: ["multidimensional scaling MDS distance matrix optimization", "classical multidimensional scaling principal coordinates", "stress value interpretation MDS"],
+    formulas: ["\\text{Stress} = \\sqrt{\\frac{\\sum (d_{ij} - \\hat{d}_{ij})^2}{\\sum d_{ij}^2}}"]
+  },
+  23: {
+    topics: ["Загальна модель факторного аналізу", "Факторні навантаження (Factor loadings) та спільність (Communality)", "Обертання факторів (Varimax, Oblimin)", "Критерій власних значень (Kaiser criterion)"],
+    google: ["exploratory factor analysis vs principal component analysis math", "factor loadings matrix rotation varimax", "communality factor analysis eigenvalue cutoff"],
+    formulas: ["X = \\Lambda F + e"]
+  },
+  24: {
+    topics: ["Процеси авторегресії (AR) та ковзного середнього (MA)", "Стаціонарність часового ряду, тест Дікі-Фуллера (ADF)", "Інтегровані процеси (differencing) та коінтеграція"],
+    google: ["autoregressive moving average ARMA model equations", "stationarity unit root test ADF mathematics", "cointegration time series analysis math"],
+    formulas: ["X_t = c + \\sum \\phi_i X_{t-i} + \\epsilon_t"]
+  },
+  25: {
+    topics: ["Двохрівневий факторний план (2^k Factorial Design)", "Латинські квадрати та їх властивості", "Методологія поверхні відгуку (Response Surface Methodology)"],
+    google: ["factorial design of experiments design matrix", "latin square design analysis of variance math", "response surface methodology design of experiments"],
+    formulas: ["y = \\beta_0 + \\sum \\beta_i x_i + \\sum \\beta_{ij} x_i x_j"]
+  },
+  26: {
+    topics: ["Функція корисності (Utility function) та ставлення до ризику", "Теорія очікуваної корисності (Expected Utility)", "Критерії прийняття рішень: Вальда (мінімакс), Лапласа, Севіджа"],
+    google: ["utility function risk aversion expected utility math", "minimax decision rule statistics", "decision theory criteria under uncertainty"],
+    formulas: ["E[U] = \\sum P(x_i) U(x_i)"]
+  },
+  27: {
+    topics: ["Опукла оптимізація (Convex Optimization)", "Метод множників Лагранжа та двоїстість (Duality)", "Умови Каруша-Куна-Такера (KKT optimality conditions)"],
+    google: ["convex optimization lagrange multipliers dual problem", "karush kuhn tucker KKT optimality conditions", "primal dual formulation optimization math"],
+    formulas: ["L(x, \\lambda) = f(x) + \\sum \\lambda_i g_i(x)"]
+  },
+  28: {
+    topics: ["Закон Літтла (Little's Law) та його доведення", "Позначення Кендалла (Kendall's notation)", "Системи масового обслуговування M/M/1, M/G/1", "Стаціонарні ймовірності довжини черги"],
+    google: ["littles law queuing theory proof", "birth death process queue length stationary distribution", "kendalls notation queueing systems"],
+    formulas: ["L = \\lambda W"]
+  },
+  29: {
+    topics: ["Теорема Скляра про спільний розподіл", "Параметричні родини копул (Clayton, Frank, Gumbel)", "Рангові міри залежності: тау Кендалла, ро Спірмена"],
+    google: ["sklars theorem joint distribution copula definition", "archimedean copula clayton frank gumbel equations", "copula finance dependency modeling math"],
+    formulas: ["F(x, y) = C(F_X(x), F_Y(y))"]
+  },
+  30: {
+    topics: ["Оцінки в просторах високої розмірності (high-dimensional statistics)", "Геометрія регуляризації Lasso (L1) та Ridge (L2)", "Мінімізація емпіричного ризику (ERM) та розмірність Вапника-Червоненкіса (VC Dimension)"],
+    google: ["empirical risk minimization generalization bound VC dimension", "lasso L1 regularization geometry sparsity proof", "high dimensional statistics covariance estimation"],
+    formulas: ["\\hat{\\theta} = \\arg\\min \\sum (y_i - x_i^T \\theta)^2 + \\lambda \\|\\theta\\|_1"]
+  }
+};
+
+app.get('/api/roadmaps/notes/:nodeId', (request, response) => {
+  const { nodeId } = request.params
+  
+  // 1. Dynamic mapped ID translation to fit the keys in mathNotes.ts
+  let mappedId = nodeId
+  const match = nodeId.match(/^([a-z]+)_(\d+)(?:_(\d+))?$/)
+  let stepNum = 0
+  let subNum = null
+  let prefix = ''
+  
+  if (match) {
+    prefix = match[1]
+    stepNum = parseInt(match[2], 10)
+    subNum = match[3] ? parseInt(match[3], 10) : null
+    
+    if (prefix === 'math') {
+      const suffixes: Record<number, string> = {
+        1: 'desc',
+        2: 'prob',
+        3: 'dist',
+        4: 'hyp',
+        5: 'la_vec',
+        6: 'la_trans',
+        7: 'calc_deriv',
+        8: 'calc_optim',
+        9: 'bayes',
+        10: 'stat_inf'
+      }
+      const suffix = suffixes[stepNum]
+      if (suffix) {
+        if (subNum !== null) {
+          mappedId = `math_${stepNum}_${suffix}_${subNum}`
+        } else {
+          mappedId = `math_${stepNum}_${suffix}`
+        }
+      }
+    } else if (prefix === 'excel' && stepNum <= 10) {
+      const suffixes: Record<number, string> = {
+        1: 'intro',
+        2: 'formulas',
+        3: 'logical',
+        4: 'lookup',
+        5: 'cleaning',
+        6: 'pivots',
+        7: 'powerquery',
+        8: 'charts',
+        9: 'analysis',
+        10: 'macros'
+      }
+      const suffix = suffixes[stepNum]
+      if (suffix) {
+        if (subNum !== null) {
+          mappedId = `excel_${stepNum}_${suffix}_${subNum}`
+        } else {
+          mappedId = `excel_${stepNum}_${suffix}`
+        }
+      }
+    } else if (prefix === 'sheets' && stepNum <= 10) {
+      const suffixes: Record<number, string> = {
+        1: 'intro',
+        2: 'formulas',
+        3: 'logic',
+        4: 'lookup',
+        5: 'text',
+        6: 'web',
+        7: 'array',
+        8: 'advanced',
+        9: 'visual',
+        10: 'script'
+      }
+      const suffix = suffixes[stepNum]
+      if (suffix) {
+        if (subNum !== null) {
+          mappedId = `sheets_${stepNum}_${suffix}_${subNum}`
+        } else {
+          mappedId = `sheets_${stepNum}_${suffix}`
+        }
+      }
+    }
+  }
+
+  let notes = mathNotes[mappedId] || null
+
+  // 2. Fallback generator if no pre-written textbook note exists in mathNotes.ts OR to enrich details
+  if (!notes || prefix === 'math') {
+    const nodeInfo = (() => {
+      try {
+        const roadmaps = listRoadmaps(1)
+        for (const r of roadmaps) {
+          if (r.canvas_data) {
+            const canvas = JSON.parse(r.canvas_data)
+            if (canvas && Array.isArray(canvas.nodes)) {
+              const node = canvas.nodes.find((n: any) => n.id === nodeId)
+              if (node) {
+                return { title: node.title, text: node.text }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error finding node title", e)
+      }
+      return null
+    })()
+
+    if (nodeInfo) {
+      const titleWithoutNumber = nodeInfo.title.substring(nodeInfo.title.indexOf(' ') + 1)
+      const isSubstep = nodeId.includes('_') && nodeId.split('_').length > 2
+      const details = mathStepDetails[stepNum] || { topics: [], google: [], formulas: [] }
+
+      if (isSubstep) {
+        const parts = nodeId.split('_')
+        const currentSubNum = parseInt(parts[2], 10)
+        
+        if (currentSubNum === 8) {
+          notes = `## Контрольний кейс та самоперевірка: ${titleWithoutNumber}
+
+### 1. Опис практичного кейсу
+У цьому розділі ви застосуєте вивчений матеріал на практиці. Нижче наведено опис аналітичної задачі для теми **"${titleWithoutNumber}"** та орієнтовні кроки її розв'язання.
+
+### 2. Практичні завдання та кроки вирішення
+1. **Аналітичний опис**: Сформулюйте математичну модель задачі та випишіть вхідні дані.
+2. **Покрокове розв'язання**: Виконайте розрахунки вручну на папері, використовуючи формули з попередніх розділів.
+3. **Аналіз результату**: Перевірте правильність отриманого значення з точки зору математичної коректності.
+
+### 3. Контрольні запитання для самоперевірки
+* Які основні припущення були використані під час розв'язання?
+* Як зміниться кінцевий результат при коливанні вхідних параметрів?
+* Які обмеження має обраний математичний метод?
+
+### 4. Про що гуглити для додаткового аналізу (English / Українська):
+${details.google.map(q => `* \`${q} practice\` / \`${q} задачі з розв'язками\``).join('\n')}
+
+---
+> [!TIP]
+> Спробуйте виконати всі розрахунки самостійно на папері перед тим, як переходити до наступного кроку.`
+        } else {
+          // If we have custom textbook notes, let's prepend our custom checklist to it!
+          const preText = notes ? notes + "\n\n---\n\n## Додатковий путівник по вивченню:\n" : `## ${nodeInfo.title}\n\n`;
+          
+          notes = preText + `### 1. Конкретні теми для вивчення:
+${details.topics.map(t => `* **${t}**`).join('\n')}
+
+### 2. Ключові формули та позначення:
+${details.formulas.map(f => `$$ ${f} $$`).join('\n')}
+
+### 3. Про що саме гуглити (рекомендовані пошукові запити):
+${details.google.map(q => `* \`${q}\` (рекомендовано шукати англійською для кращих джерел)`).join('\n')}
+
+### 4. Завдання на самостійне опрацювання:
+1. Запишіть базові визначення та виведіть вказані формули у свій робочий конспект.
+2. Розберіть демонстраційні завдання та самостійно перевірте розрахунки.
+`;
+        }
+      } else {
+        notes = `## ${nodeInfo.title}
+
+### Опис теми
+${nodeInfo.text}
+
+Цей навчальний блок присвячений детальному вивченню теми **"${titleWithoutNumber}"**.
+
+### Конкретні теми для вивчення:
+${details.topics.map(t => `* **${t}**`).join('\n')}
+
+### Ключові формули:
+${details.formulas.map(f => `$$ ${f} $$`).join('\n')}
+
+### Про що гуглити:
+${details.google.map(q => `* \`${q}\``).join('\n')}
+
+### План вивчення теми (8 підтем):
+1. **Теоретичний фундамент та концепції** (визначення, базові поняття та аксіоми).
+2. **Математичний апарат та формули** (формальні рівняння, доведення та вирази).
+3. **Покрокові приклади обчислень** (розбір прикладів та розв'язання задач на папері).
+4. **Аналітичні вправи та завдання** (завдання на самостійну перевірку логіки).
+5. **Застосування в аналізі даних** (як концепція використовується при роботі з ознаками).
+6. **Історичний та науковий контекст** (науковий бекграунд та видатні теореми).
+7. **Межі застосовності та помилки** (типові помилки та обмеження методів).
+8. **Контрольний кейс та тестування** (практичний розбір кейсу та перевірка знань).`;
+      }
+    }
+  }
+
+  response.json({ notes })
+});

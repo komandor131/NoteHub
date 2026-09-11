@@ -1,4 +1,268 @@
-/* ProjectsPanel styling */
-.projectsPanel {
-  /* Scope overrides here */
+/* Custom Confirmation Dialog Overlay */
+.confirmOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.confirmCard {
+  background: rgba(24, 24, 27, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4), 0 0 24px rgba(168, 85, 247, 0.1);
+  text-align: center;
+  animation: scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.confirmTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 12px;
+}
+
+.confirmMessage {
+  font-size: 13.5px;
+  color: #a1a1aa;
+  line-height: 1.5;
+  margin: 0 0 24px;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* Media Tab Wrapper */
+.mediaTabWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 20px;
+  animation: slideUpFade 0.25s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.mediaFormCard {
+  background: rgba(24, 24, 27, 0.45);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.mediaFormCard h3 {
+  margin: 0 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.mediaForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.formLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formLabel span {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+
+.formLabel input,
+.formLabel select,
+.formLabel textarea {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #ffffff;
+  font-size: 13.5px;
+  transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  outline: none;
+}
+
+.formLabel input:focus,
+.formLabel select:focus,
+.formLabel textarea:focus {
+  border-color: var(--pink-strong);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Media Grid Layout */
+.mediaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.mediaCard {
+  background: rgba(24, 24, 27, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.mediaCard:hover {
+  border-color: rgba(168, 85, 247, 0.3);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(168, 85, 247, 0.08);
+}
+
+.cardImageWrapper {
+  width: 100%;
+  height: 160px;
+  background: #09090b;
+  overflow: hidden;
+  position: relative;
+}
+
+.cardImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.mediaCard:hover .cardImage {
+  transform: scale(1.05);
+}
+
+.cardLinkWrapper {
+  width: 100%;
+  height: 120px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.cardLinkBtn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 4px 16px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #ffffff;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.cardLinkBtn:hover {
+  background: var(--pink-strong);
+  border-color: var(--pink-strong);
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
+}
+
+.cardContent {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.cardTitle {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.cardNote {
+  font-size: 12.5px;
+  color: #a1a1aa;
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.emptyMedia {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 48px;
+  color: var(--muted);
+  font-size: 13.5px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+}
+
+/* Typography styles for media items description */
+.fontSans {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.fontSerif {
+  font-family: Georgia, 'Times New Roman', Times, serif;
+  color: #e4e4e7;
+  letter-spacing: 0.01em;
+}
+
+.fontMono {
+  font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+  font-size: 11.5px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.fontCursive {
+  font-family: 'Comic Sans MS', cursive, sans-serif;
+  font-style: italic;
+  color: #e2e8f0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleUp {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }

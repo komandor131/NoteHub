@@ -40,6 +40,25 @@ export default function CalendarPanel({
   const selectedTasks = tasks.filter((task) => taskTouchesDay(task, selectedDate))
   const selectedSubs = subscriptions.filter((sub) => sub.next_payment_date === selectedDate)
 
+  const moodKey = `notehub_mood_${selectedDate}`
+  const [mood, setMood] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    const saved = localStorage.getItem(moodKey)
+    setMood(saved)
+  }, [selectedDate])
+
+  const handleSelectMood = (emoji: string) => {
+    const newMood = mood === emoji ? '' : emoji
+    if (newMood) {
+      localStorage.setItem(moodKey, newMood)
+      setMood(newMood)
+    } else {
+      localStorage.removeItem(moodKey)
+      setMood(null)
+    }
+  }
+
   return (
     <section className={`workspace-grid ${styles.calendarPanel}`}>
       <div className="panel calendar-panel">
@@ -130,6 +149,28 @@ export default function CalendarPanel({
             <Plus size={18} />
           </button>
         </div>
+        
+        <div className={styles.moodTracker}>
+          <span className={styles.moodLabel}>Настрій дня:</span>
+          <div className={styles.moodOptions}>
+            {[
+              { emoji: '🚀', label: 'Продуктивно' },
+              { emoji: '😊', label: 'Радісно' },
+              { emoji: '😴', label: 'Втомлено' },
+              { emoji: '🤯', label: 'Стресово' }
+            ].map((m) => (
+              <button
+                key={m.emoji}
+                type="button"
+                className={`${styles.moodBtn} ${mood === m.emoji ? styles.activeMood : ''}`}
+                onClick={() => handleSelectMood(m.emoji)}
+                title={m.label}
+              >
+                <span className={styles.moodEmoji}>{m.emoji}</span>
+              </button>
+            ))}
+          </div>
+        </div>
         <TaskFiltersBox
           filters={filters}
           tags={tags}
@@ -200,6 +241,7 @@ function MonthCalendar({
       {cells.map((cell) => {
         const cellTasks = tasks.filter((task) => taskTouchesDay(task, cell.key))
         const cellSubs = subscriptions.filter((sub) => sub.next_payment_date === cell.key)
+        const cellMood = localStorage.getItem(`notehub_mood_${cell.key}`)
         return (
           <button
             type="button"
@@ -210,7 +252,10 @@ function MonthCalendar({
             onClick={() => onSelectDate(cell.key)}
             onDoubleClick={() => onCreateTask(cell.key)}
           >
-            <span className="cell-date">{cell.date.getDate()}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', minHeight: '24px' }}>
+              <span className="cell-date">{cell.date.getDate()}</span>
+              {cellMood && <span style={{ fontSize: '13px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}>{cellMood}</span>}
+            </div>
             <span className="cell-stack">
               {cellSubs.map((sub) => (
                 <span

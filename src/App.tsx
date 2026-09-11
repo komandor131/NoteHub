@@ -1,5 +1,6 @@
 import Editor from '@monaco-editor/react'
 import {
+  LayoutDashboard,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -90,6 +91,8 @@ import {
 import StudyPanel from './components/StudyPanel/StudyPanel'
 import Auth from './Auth'
 import { useAuth } from './AuthContext'
+import { useConfirm } from './context/ConfirmContext'
+import DashboardPanel from './components/DashboardPanel/DashboardPanel'
 
 import CalendarPanel from './components/CalendarPanel/CalendarPanel'
 import TasksPanel from './components/TasksPanel/TasksPanel'
@@ -162,7 +165,7 @@ import type {
   SnippetFilters,
 } from './types'
 
-type Section = 'calendar' | 'tasks' | 'vault' | 'finance' | 'diary' | 'files' | 'projects' | 'habits' | 'mindmaps' | 'roadmaps' | 'study'
+type Section = 'dashboard' | 'calendar' | 'tasks' | 'vault' | 'finance' | 'diary' | 'files' | 'projects' | 'habits' | 'mindmaps' | 'roadmaps' | 'study'
 type SnippetSelection = number | 'new' | null
 
 
@@ -179,7 +182,8 @@ type SnippetSelection = number | 'new' | null
 
 
 
-const navigation: Array<{ id: Section; label: string; icon: typeof CalendarDays }> = [
+const navigation: Array<{ id: Section; label: string; icon: any }> = [
+  { id: 'dashboard', label: 'Головна', icon: LayoutDashboard },
   { id: 'calendar', label: 'Календар', icon: CalendarDays },
   { id: 'tasks', label: 'Задачі', icon: ListChecks },
   { id: 'vault', label: 'Сховище коду', icon: Code2 },
@@ -213,7 +217,8 @@ function advancePaymentDate(dateStr: string, period: 'monthly' | 'weekly') {
 
 function App() {
   const { user, loading: authLoading, logout } = useAuth();
-  const [section, setSection] = useState<Section>('calendar')
+  const confirm = useConfirm();
+  const [section, setSection] = useState<Section>('dashboard')
   const [tasks, setTasks] = useState<Task[]>([])
   const [snippets, setSnippets] = useState<Snippet[]>([])
   const [balance, setBalance] = useState<number>(0)
@@ -343,6 +348,22 @@ function App() {
     return () => window.clearTimeout(timeout)
   }, [globalSearch])
 
+  // Synchronize hash routing for Roadmaps and Lectures
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash
+      const match = hash.match(/^#\/roadmap\/(\d+)/)
+      if (match) {
+        const rId = Number(match[1])
+        setSection('roadmaps')
+        setSelectedRoadmapId(rId)
+      }
+    }
+    handleHash()
+    window.addEventListener('hashchange', handleHash)
+    return () => window.removeEventListener('hashchange', handleHash)
+  }, [])
+
   const taskTags = useMemo(() => uniqueTags(tasks), [tasks])
   const snippetTags = useMemo(() => uniqueTags(snippets), [snippets])
   const snippetLanguages = useMemo(
@@ -451,8 +472,11 @@ function App() {
     }
   }
 
-  const removeTask = async (task: Task) => {
-    if (!window.confirm(`Видалити "${task.title}"?`)) {
+  const removeTask = async (task: Task, bypassConfirm = false) => {
+    if (!bypassConfirm && !(await confirm({
+      title: 'Видалення задачі',
+      message: `Ви дійсно хочете видалити задачу "${task.title}"?`,
+    }))) {
       return
     }
     try {
@@ -482,7 +506,10 @@ function App() {
   }
 
   const removeSnippet = async (snippet: Snippet) => {
-    if (!window.confirm(`Видалити "${snippet.title}"?`)) {
+    if (!(await confirm({
+      title: 'Видалення сніпета',
+      message: `Ви дійсно хочете видалити фрагмент коду "${snippet.title}"?`,
+    }))) {
       return
     }
     try {
@@ -543,7 +570,11 @@ function App() {
       return
     }
     
-    const deduct = window.confirm(`Списати ${amount.toLocaleString('uk-UA')} ₴ з основного балансу грошей?`)
+    const deduct = await confirm({
+      title: 'Списання коштів',
+      message: `Списати ${amount.toLocaleString('uk-UA')} ₴ з основного балансу грошей?`,
+      isDanger: false,
+    })
     if (deduct && balance < amount) {
       alert('Недостатньо коштів на балансі!')
       return
@@ -576,7 +607,11 @@ function App() {
       return
     }
 
-    const addToBalance = window.confirm(`Додати ${amount.toLocaleString('uk-UA')} ₴ назад на основний баланс?`)
+    const addToBalance = await confirm({
+      title: 'Повернення на баланс',
+      message: `Додати ${amount.toLocaleString('uk-UA')} ₴ назад на основний баланс?`,
+      isDanger: false,
+    })
 
     try {
       await updateGoal(goal.id, {
@@ -596,7 +631,10 @@ function App() {
   }
 
   const removeGoal = async (goal: FinanceGoal) => {
-    if (!window.confirm(`Видалити ціль "${goal.title}"?`)) {
+    if (!(await confirm({
+      title: 'Видалення фінансової цілі',
+      message: `Ви дійсно хочете видалити ціль "${goal.title}"?`,
+    }))) {
       return
     }
     try {
@@ -634,7 +672,10 @@ function App() {
   }
 
   const removeSub = async (sub: Subscription) => {
-    if (!window.confirm(`Видалити підписку "${sub.title}"?`)) {
+    if (!(await confirm({
+      title: 'Видалення підписки',
+      message: `Ви дійсно хочете видалити підписку "${sub.title}"?`,
+    }))) {
       return
     }
     try {
@@ -646,9 +687,11 @@ function App() {
   }
 
   const handlePaySubscription = async (sub: Subscription) => {
-    const confirmPay = window.confirm(
-      `Сплатити підписку "${sub.title}" на суму ${sub.amount.toLocaleString('uk-UA')} ₴?\nЦе спише гроші з балансу і перенесе платіж на наступний період.`
-    )
+    const confirmPay = await confirm({
+      title: 'Оплата підписки',
+      message: `Сплатити підписку "${sub.title}" на суму ${sub.amount.toLocaleString('uk-UA')} ₴?\nЦе спише гроші з балансу і перенесе платіж на наступний період.`,
+      isDanger: false,
+    })
     if (!confirmPay) return
 
     if (balance < sub.amount) {
@@ -702,7 +745,10 @@ function App() {
   }
 
   const removeDiary = async (entry: DiaryEntry) => {
-    if (!window.confirm(`Видалити запис "${entry.title}"?`)) {
+    if (!(await confirm({
+      title: 'Видалення запису щоденника',
+      message: `Ви дійсно хочете видалити запис "${entry.title}"?`,
+    }))) {
       return
     }
     try {
@@ -715,7 +761,10 @@ function App() {
 
   // Attachment Actions
   const removeAttachment = async (attachment: Attachment) => {
-    if (!window.confirm(`Видалити "${attachment.originalName}"?`)) {
+    if (!(await confirm({
+      title: 'Видалення файлу',
+      message: `Ви дійсно хочете видалити файл "${attachment.originalName}"?`,
+    }))) {
       return
     }
     try {
@@ -753,11 +802,13 @@ function App() {
     }
   }
 
-  const removeProject = async (proj: Project) => {
+  const removeProject = async (proj: Project, bypassConfirm = false) => {
     if (
-      !window.confirm(
-        `Видалити проєкт "${proj.title}"? Це також відв'яже всі пов'язані задачі та фрагменти коду.`
-      )
+      !bypassConfirm &&
+      !(await confirm({
+        title: 'Видалення проєкту',
+        message: `Видалити проєкт "${proj.title}"? Це також відв'яже всі пов'язані задачі та фрагменти коду.`,
+      }))
     ) {
       return
     }
@@ -862,7 +913,10 @@ function App() {
   }
 
   const removeRoadmap = async (roadmap: Roadmap) => {
-    if (!window.confirm(`Видалити роадмап "${roadmap.title}"?`)) {
+    if (!(await confirm({
+      title: 'Видалення роадмапи',
+      message: `Ви дійсно хочете видалити роадмап "${roadmap.title}"?`,
+    }))) {
       return
     }
     try {
@@ -907,7 +961,10 @@ function App() {
   }
 
   const removeHabit = async (id: number) => {
-    if (!window.confirm('Ви впевнені, що хочете видалити цю звичку?')) {
+    if (!(await confirm({
+      title: 'Видалення звички',
+      message: 'Ви впевнені, що хочете видалити цю звичку?',
+    }))) {
       return
     }
     try {
@@ -955,7 +1012,10 @@ function App() {
   }
 
   const handleRemoveMindMap = async (id: number, title: string) => {
-    if (!window.confirm(`Ви дійсно хочете видалити інтелект-карту "${title}"?`)) return
+    if (!(await confirm({
+      title: 'Видалення інтелект-карти',
+      message: `Ви дійсно хочете видалити інтелект-карту "${title}"?`,
+    }))) return
     try {
       await deleteMindMap(id)
       if (selectedMindMapId === id) {
@@ -1025,100 +1085,101 @@ function App() {
           })}
         </nav>
 
-        <div style={{ marginTop: 'auto', padding: '16px' }}>
+        <div className="sidebar-footer">
           <button 
             type="button"
-            className="nav-item" 
-            style={{ color: 'var(--red)', width: '100%', display: 'flex', alignItems: 'center', gap: '8px' }} 
+            className="logout-btn" 
             onClick={logout}
           >
             <span>🚪</span>
             Вийти
           </button>
-        </div>
 
-        <div className="sidebar-stats">
-          <Stat label="Задач" value={tasks.length} />
-          <Stat label="Код" value={snippets.length} />
-          <Stat label="Карт" value={mindMaps.length} />
-          <Stat label="Проєктів" value={projects.length} />
-          <Stat label="Цілей" value={goals.length} />
-          <Stat label="Підписок" value={subscriptions.length} />
-          <Stat label="Записів" value={diaryEntries.length} />
-          <Stat label="Файлів" value={allAttachments.length} />
+          <div className="sidebar-stats-grid">
+            <div className="stat-badge"><span>Задач</span><strong>{tasks.length}</strong></div>
+            <div className="stat-badge"><span>Код</span><strong>{snippets.length}</strong></div>
+            <div className="stat-badge"><span>Карт</span><strong>{mindMaps.length}</strong></div>
+            <div className="stat-badge"><span>Проєктів</span><strong>{projects.length}</strong></div>
+            <div className="stat-badge"><span>Цілей</span><strong>{goals.length}</strong></div>
+            <div className="stat-badge"><span>Платежів</span><strong>{subscriptions.length}</strong></div>
+            <div className="stat-badge"><span>Записів</span><strong>{diaryEntries.length}</strong></div>
+            <div className="stat-badge"><span>Файлів</span><strong>{allAttachments.length}</strong></div>
+          </div>
         </div>
       </aside>
 
       <main className="main-panel">
-        <header className="topbar">
-          <div>
-            <h1>{sectionTitle(section)}</h1>
-            <p>
-              {loading
-                ? 'Завантаження даних...'
-                : `${tasks.length} задач, ${snippets.length} фрагментів коду, ${allAttachments.length} файлів`}
-            </p>
-          </div>
-          <div className="topbar-actions">
-            <label className="search-box">
-              <Search size={16} />
-              <input
-                value={globalSearch}
-                onChange={(event) => setGlobalSearch(event.target.value)}
-                placeholder="Пошук усюди..."
-              />
-            </label>
-            {section === 'mindmaps' && (
-              <button className="btn primary" type="button" onClick={handleCreateMindMap}>
-                <Plus size={16} />
-                Нова карта
-              </button>
-            )}
-            {section === 'projects' && (
-              <button className="btn primary" type="button" onClick={openNewProject}>
-                <Plus size={16} />
-                Новий проєкт
-              </button>
-            )}
-            {section === 'vault' && (
-              <button className="btn secondary" type="button" onClick={() => setSnippetSelection('new')}>
-                <Code2 size={16} />
-                Новий код
-              </button>
-            )}
-            {section === 'finance' && (
-              <div className="row-actions">
-                <button className="btn secondary" type="button" onClick={openNewSub}>
-                  <Repeat size={14} />
-                  Новий платіж
-                </button>
-                <button className="btn primary" type="button" onClick={openNewGoal}>
+        {section !== 'dashboard' && (
+          <header className="topbar">
+            <div>
+              <h1>{sectionTitle(section)}</h1>
+              <p>
+                {loading
+                  ? 'Завантаження даних...'
+                  : `${tasks.length} задач, ${snippets.length} фрагментів коду, ${allAttachments.length} файлів`}
+              </p>
+            </div>
+            <div className="topbar-actions">
+              <label className="search-box">
+                <Search size={16} />
+                <input
+                  value={globalSearch}
+                  onChange={(event) => setGlobalSearch(event.target.value)}
+                  placeholder="Пошук усюди..."
+                />
+              </label>
+              {section === 'mindmaps' && (
+                <button className="btn primary" type="button" onClick={handleCreateMindMap}>
                   <Plus size={16} />
-                  Додати ціль
+                  Нова карта
                 </button>
-              </div>
-            )}
-            {section === 'diary' && (
-              <button className="btn primary" type="button" onClick={openNewDiary}>
-                <Plus size={16} />
-                Новий запис
-              </button>
-            )}
-            {section === 'habits' && (
-              <button className="btn primary" type="button" onClick={openNewHabit}>
-                <Plus size={16} />
-                Нова звичка
-              </button>
-            )}
-            {(section === 'calendar' || section === 'tasks') && (
-              <button className="btn primary" type="button" onClick={() => openNewTask()}>
-                <Plus size={16} />
-                Задача
-              </button>
-            )}
-          </div>
-          {globalResults ? <GlobalResults results={globalResults} /> : null}
-        </header>
+              )}
+              {section === 'projects' && (
+                <button className="btn primary" type="button" onClick={openNewProject}>
+                  <Plus size={16} />
+                  Новий проєкт
+                </button>
+              )}
+              {section === 'vault' && (
+                <button className="btn secondary" type="button" onClick={() => setSnippetSelection('new')}>
+                  <Code2 size={16} />
+                  Новий код
+                </button>
+              )}
+              {section === 'finance' && (
+                <div className="row-actions">
+                  <button className="btn secondary" type="button" onClick={openNewSub}>
+                    <Repeat size={14} />
+                    Новий платіж
+                  </button>
+                  <button className="btn primary" type="button" onClick={openNewGoal}>
+                    <Plus size={16} />
+                    Додати ціль
+                  </button>
+                </div>
+              )}
+              {section === 'diary' && (
+                <button className="btn primary" type="button" onClick={openNewDiary}>
+                  <Plus size={16} />
+                  Новий запис
+                </button>
+              )}
+              {section === 'habits' && (
+                <button className="btn primary" type="button" onClick={openNewHabit}>
+                  <Plus size={16} />
+                  Нова звичка
+                </button>
+              )}
+              {(section === 'calendar' || section === 'tasks') && (
+                <button className="btn primary" type="button" onClick={() => openNewTask()}>
+                  <Plus size={16} />
+                  Задача
+                </button>
+              )}
+            </div>
+            {globalResults ? <GlobalResults results={globalResults} /> : null}
+          </header>
+        )}
 
         {error ? (
           <div className="alert" role="alert">
@@ -1129,164 +1190,221 @@ function App() {
           </div>
         ) : null}
 
-        {section === 'calendar' ? (
-          <CalendarPanel
-            tasks={filteredTasks}
-            subscriptions={subscriptions}
-            selectedDate={selectedDate}
-            view={calendarView}
-            filters={taskFilters}
-            tags={taskTags}
-            onDateChange={setSelectedDate}
-            onViewChange={setCalendarView}
-            onFiltersChange={setTaskFilters}
-            onCreateTask={openNewTask}
-            onEditTask={openEditTask}
-            onPaySub={handlePaySubscription}
-          />
-        ) : null}
+        <div key={section} className="page-enter-active" style={{ display: 'flex', flexDirection: 'column', gap: '24px', flex: 1 }}>
+          {section === 'dashboard' ? (
+            <DashboardPanel
+              user={user}
+              tasks={tasks}
+              projects={projects}
+              snippets={snippets}
+              attachments={allAttachments}
+              habits={habits}
+              goals={goals}
+              subscriptions={subscriptions}
+              balance={balance}
+              setSection={setSection}
+              openNewTask={openNewTask}
+              openNewProject={openNewProject}
+              openNewDiary={openNewDiary}
+              openNewHabit={openNewHabit}
+              openNewSub={openNewSub}
+              onToggleTask={async (task) => {
+                try {
+                  const newStatus = task.status === 'done' ? 'todo' : 'done'
+                  await updateTask(task.id, {
+                    title: task.title,
+                    description: task.description || '',
+                    type: task.type,
+                    status: newStatus,
+                    priority: task.priority,
+                    projectId: task.projectId,
+                    tags: task.tags,
+                    color: task.color || '#a855f7',
+                    startAt: task.startAt,
+                    endAt: task.endAt,
+                    dueDate: task.dueDate || null,
+                  })
+                  await loadData()
+                } catch (requestError) {
+                  setError(errorMessage(requestError))
+                }
+              }}
+              onEditTask={openEditTask}
+            />
+          ) : null}
 
-        {section === 'tasks' ? (
-          <TasksPanel
-            tasks={filteredTasks}
-            filters={taskFilters}
-            tags={taskTags}
-            onFiltersChange={setTaskFilters}
-            onCreateTask={() => openNewTask()}
-            onEditTask={openEditTask}
-            onDeleteTask={removeTask}
-            onDeleteAttachment={removeAttachment}
-          />
-        ) : null}
+          {section === 'calendar' ? (
+            <CalendarPanel
+              tasks={filteredTasks}
+              subscriptions={subscriptions}
+              selectedDate={selectedDate}
+              view={calendarView}
+              filters={taskFilters}
+              tags={taskTags}
+              onDateChange={setSelectedDate}
+              onViewChange={setCalendarView}
+              onFiltersChange={setTaskFilters}
+              onCreateTask={openNewTask}
+              onEditTask={openEditTask}
+              onPaySub={handlePaySubscription}
+            />
+          ) : null}
 
-        {section === 'vault' ? (
-          <VaultPanel
-            snippets={filteredSnippets}
-            allSnippets={snippets}
-            selectedSnippet={selectedSnippet}
-            selection={snippetSelection}
-            filters={snippetFilters}
-            tags={snippetTags}
-            languages={snippetLanguages}
-            isFullscreenCode={isFullscreenCode}
-            projects={projects}
-            quickSnippetProjectId={quickSnippetProjectId}
-            onSelect={setSnippetSelection}
-            onFiltersChange={setSnippetFilters}
-            onSave={saveSnippet}
-            onDelete={removeSnippet}
-            onDeleteAttachment={removeAttachment}
-            setIsFullscreenCode={setIsFullscreenCode}
-          />
-        ) : null}
+          {section === 'tasks' ? (
+            <TasksPanel
+              tasks={filteredTasks}
+              filters={taskFilters}
+              tags={taskTags}
+              onFiltersChange={setTaskFilters}
+              onCreateTask={() => openNewTask()}
+              onEditTask={openEditTask}
+              onDeleteTask={removeTask}
+              onDeleteAttachment={removeAttachment}
+              onUpdateTask={async (id, payload) => {
+                try {
+                  await updateTask(id, payload)
+                  await loadData()
+                } catch (requestError) {
+                  setError(errorMessage(requestError))
+                }
+              }}
+            />
+          ) : null}
 
-        {section === 'projects' ? (
-          <ProjectsPanel
-            projects={projects}
-            tasks={tasks}
-            snippets={snippets}
-            selectedProjectId={selectedProjectId}
-            onSelectProject={setSelectedProjectId}
-            onCreateProject={openNewProject}
-            onEditProject={openEditProject}
-            onDeleteProject={removeProject}
-            onDeleteAttachment={removeAttachment}
-            onQuickCreateTask={handleQuickCreateTask}
-            onQuickCreateSnippet={handleQuickCreateSnippet}
-            onSaveCanvas={saveProjectCanvas}
-            onUpdateTask={async (id, payload) => {
-              try {
-                await updateTask(id, payload)
-                await loadData()
-              } catch (requestError) {
-                setError(errorMessage(requestError))
-              }
-            }}
-            setSection={setSection}
-            setSnippetSelection={setSnippetSelection}
-            openEditTask={openEditTask}
-            onRefreshData={loadData}
-            onToggleProjectCompleted={toggleProjectCompleted}
-          />
-        ) : null}
+          {section === 'vault' ? (
+            <VaultPanel
+              snippets={filteredSnippets}
+              allSnippets={snippets}
+              selectedSnippet={selectedSnippet}
+              selection={snippetSelection}
+              filters={snippetFilters}
+              tags={snippetTags}
+              languages={snippetLanguages}
+              isFullscreenCode={isFullscreenCode}
+              projects={projects}
+              quickSnippetProjectId={quickSnippetProjectId}
+              onSelect={setSnippetSelection}
+              onFiltersChange={setSnippetFilters}
+              onSave={saveSnippet}
+              onDelete={removeSnippet}
+              onDeleteAttachment={removeAttachment}
+              setIsFullscreenCode={setIsFullscreenCode}
+            />
+          ) : null}
 
-        {section === 'mindmaps' ? (
-          <MindMapsPanel
-            mindMaps={mindMaps}
-            tasks={tasks}
-            snippets={snippets}
-            selectedMindMapId={selectedMindMapId}
-            onSelectMindMap={setSelectedMindMapId}
-            onCreateMindMap={handleCreateMindMap}
-            onDeleteMindMap={handleRemoveMindMap}
-            onSaveMindMap={handleSaveMindMap}
-            setSection={setSection}
-            setSnippetSelection={setSnippetSelection}
-            openEditTask={openEditTask}
-            onRefreshData={loadData}
-          />
-        ) : null}
+          {section === 'projects' ? (
+            <ProjectsPanel
+              projects={projects}
+              tasks={tasks}
+              snippets={snippets}
+              selectedProjectId={selectedProjectId}
+              onSelectProject={setSelectedProjectId}
+              onCreateProject={openNewProject}
+              onEditProject={openEditProject}
+              onDeleteProject={removeProject}
+              onDeleteAttachment={removeAttachment}
+              onQuickCreateTask={handleQuickCreateTask}
+              onQuickCreateSnippet={handleQuickCreateSnippet}
+              onSaveCanvas={saveProjectCanvas}
+              onUpdateTask={async (id, payload) => {
+                try {
+                  await updateTask(id, payload)
+                  await loadData()
+                } catch (requestError) {
+                  setError(errorMessage(requestError))
+                }
+              }}
+              onDeleteTask={removeTask}
+              setSection={setSection}
+              setSnippetSelection={setSnippetSelection}
+              openEditTask={openEditTask}
+              onRefreshData={loadData}
+              onToggleProjectCompleted={toggleProjectCompleted}
+            />
+          ) : null}
 
-        {section === 'roadmaps' ? (
-          <RoadmapsPanel
-            roadmaps={roadmaps}
-            selectedRoadmapId={selectedRoadmapId}
-            onSelectRoadmap={setSelectedRoadmapId}
-            onCreateRoadmap={openNewRoadmap}
-            onEditRoadmap={openEditRoadmap}
-            onDeleteRoadmap={removeRoadmap}
-            onSaveCanvas={saveRoadmapCanvas}
-          />
-        ) : null}
+          {section === 'mindmaps' ? (
+            <MindMapsPanel
+              mindMaps={mindMaps}
+              tasks={tasks}
+              snippets={snippets}
+              selectedMindMapId={selectedMindMapId}
+              onSelectMindMap={setSelectedMindMapId}
+              onCreateMindMap={handleCreateMindMap}
+              onDeleteMindMap={handleRemoveMindMap}
+              onSaveMindMap={handleSaveMindMap}
+              setSection={setSection}
+              setSnippetSelection={setSnippetSelection}
+              openEditTask={openEditTask}
+              onRefreshData={loadData}
+            />
+          ) : null}
 
-        {section === 'finance' ? (
-          <FinancePanel
-            balance={balance}
-            goals={goals}
-            subscriptions={subscriptions}
-            onChangeBalance={changeBalance}
-            onAdjustBalance={adjustBalance}
-            onContribute={contributeToGoal}
-            onWithdraw={withdrawFromGoal}
-            onEditGoal={openEditGoal}
-            onDeleteGoal={removeGoal}
-            onEditSub={openEditSub}
-            onDeleteSub={removeSub}
-            onPaySub={handlePaySubscription}
-            onAddSub={openNewSub}
-          />
-        ) : null}
+          {section === 'roadmaps' ? (
+            <RoadmapsPanel
+              roadmaps={roadmaps}
+              selectedRoadmapId={selectedRoadmapId}
+              onSelectRoadmap={setSelectedRoadmapId}
+              onCreateRoadmap={openNewRoadmap}
+              onEditRoadmap={openEditRoadmap}
+              onDeleteRoadmap={removeRoadmap}
+              onSaveCanvas={saveRoadmapCanvas}
+              mindMaps={mindMaps}
+              onSelectMindMap={setSelectedMindMapId}
+              setSection={setSection}
+              onRefreshData={loadData}
+            />
+          ) : null}
 
-        {section === 'diary' ? (
-          <DiaryPanel
-            diarySearch={diarySearch}
-            setDiarySearch={setDiarySearch}
-            entries={filteredDiaryEntries}
-            onEdit={openEditDiary}
-            onDelete={removeDiary}
-          />
-        ) : null}
+          {section === 'finance' ? (
+            <FinancePanel
+              balance={balance}
+              goals={goals}
+              subscriptions={subscriptions}
+              onChangeBalance={changeBalance}
+              onAdjustBalance={adjustBalance}
+              onContribute={contributeToGoal}
+              onWithdraw={withdrawFromGoal}
+              onEditGoal={openEditGoal}
+              onDeleteGoal={removeGoal}
+              onEditSub={openEditSub}
+              onDeleteSub={removeSub}
+              onPaySub={handlePaySubscription}
+              onAddSub={openNewSub}
+            />
+          ) : null}
 
-        {section === 'habits' ? (
-          <HabitsPanel
-            habits={habits}
-            onCreateHabit={openNewHabit}
-            onToggleHabit={handleToggleHabit}
-            onDeleteHabit={removeHabit}
-          />
-        ) : null}
+          {section === 'diary' ? (
+            <DiaryPanel
+              diarySearch={diarySearch}
+              setDiarySearch={setDiarySearch}
+              entries={filteredDiaryEntries}
+              onEdit={openEditDiary}
+              onDelete={removeDiary}
+            />
+          ) : null}
 
-        {section === 'files' ? (
-          <FilesPanel
-            attachments={allAttachments}
-            tasks={tasks}
-            snippets={snippets}
-            goals={goals}
-            diaryEntries={diaryEntries}
-            projects={projects}
-            onDeleteAttachment={removeAttachment}
-          />
-        ) : null}
+          {section === 'habits' ? (
+            <HabitsPanel
+              habits={habits}
+              onCreateHabit={openNewHabit}
+              onToggleHabit={handleToggleHabit}
+              onDeleteHabit={removeHabit}
+            />
+          ) : null}
+
+          {section === 'files' ? (
+            <FilesPanel
+              attachments={allAttachments}
+              tasks={tasks}
+              snippets={snippets}
+              goals={goals}
+              diaryEntries={diaryEntries}
+              projects={projects}
+              onDeleteAttachment={removeAttachment}
+            />
+          ) : null}
+        </div>
       </main>
 
       <TaskDrawer

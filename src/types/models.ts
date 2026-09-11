@@ -12,6 +12,7 @@ export interface UserRecord {
 }
 
 export type Section =
+  | 'dashboard'
   | 'calendar'
   | 'tasks'
   | 'vault'

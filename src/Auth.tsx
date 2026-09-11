@@ -134,22 +134,6 @@ export default function Auth() {
               )}
             </button>
           </form>
-
-          <div className="mt-8 pt-6 border-t border-[#27272a] text-center">
-            <p className="text-sm text-[#a1a1aa]">
-              {isLogin ? "Don't have an account? " : "Already have an account? "}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsLogin(!isLogin);
-                  setError('');
-                }}
-                className="text-white hover:text-[#e4e4e7] font-semibold transition-colors border-b border-transparent hover:border-white"
-              >
-                {isLogin ? 'Sign up' : 'Sign in'}
-              </button>
-            </p>
-          </div>
         </div>
       </div>
     </div>

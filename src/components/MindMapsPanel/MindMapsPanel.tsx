@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
   ChevronLeft,
+  ChevronRight,
+  Home,
   Plus,
   Trash2,
   Save,
@@ -63,6 +65,12 @@ export default function MindMapsPanel({
 
   const [mapTitle, setMapTitle] = useState('')
 
+  // Sub-mapping and nested study states
+  const [rootNodes, setRootNodes] = useState<MindMapNode[]>([])
+  const [rootLinks, setRootLinks] = useState<Array<{ fromId: string; toId: string }>>([])
+  const [subMaps, setSubMaps] = useState<Record<string, { nodes: MindMapNode[], links: Array<{ fromId: string; toId: string }> }>>({})
+  const [navigationPath, setNavigationPath] = useState<Array<{ nodeId: string; nodeTitle: string }>>([])
+
   // Synchronize state when mind map selection changes
   useEffect(() => {
     if (mindMap) {
@@ -70,13 +78,20 @@ export default function MindMapsPanel({
         const parsed = JSON.parse(mindMap.nodes_data)
         let parsedNodes: MindMapNode[] = []
         let parsedLinks: Array<{ fromId: string; toId: string }> = []
+        let parsedSubMaps: Record<string, { nodes: MindMapNode[], links: Array<{ fromId: string; toId: string }> }> = {}
 
         if (Array.isArray(parsed)) {
           parsedNodes = parsed
         } else if (parsed && typeof parsed === 'object') {
           parsedNodes = parsed.nodes || []
           parsedLinks = parsed.links || []
+          parsedSubMaps = parsed.subMaps || {}
         }
+
+        setRootNodes(parsedNodes)
+        setRootLinks(parsedLinks)
+        setSubMaps(parsedSubMaps)
+        setNavigationPath([])
 
         // Backwards compatibility / initial layout
         const needsLayout = parsedNodes.some((n) => n.x === undefined || n.y === undefined)
@@ -89,7 +104,8 @@ export default function MindMapsPanel({
           }))
           setNodes(layoutedNodes)
           setCustomLinks(parsedLinks)
-          void onSaveMindMap(mindMap.id, JSON.stringify({ nodes: layoutedNodes, links: parsedLinks }))
+          setRootNodes(layoutedNodes)
+          void onSaveMindMap(mindMap.id, JSON.stringify({ nodes: layoutedNodes, links: parsedLinks, subMaps: parsedSubMaps }))
         } else {
           setNodes(parsedNodes)
           setCustomLinks(parsedLinks)
@@ -97,6 +113,10 @@ export default function MindMapsPanel({
       } catch (e) {
         setNodes([])
         setCustomLinks([])
+        setRootNodes([])
+        setRootLinks([])
+        setSubMaps({})
+        setNavigationPath([])
       }
       setSelectedNodeId(null)
       setLinkingSourceId(null)
@@ -107,6 +127,10 @@ export default function MindMapsPanel({
     } else {
       setNodes([])
       setCustomLinks([])
+      setRootNodes([])
+      setRootLinks([])
+      setSubMaps({})
+      setNavigationPath([])
       setSelectedNodeId(null)
       setLinkingSourceId(null)
       setMapTitle('')
@@ -122,25 +146,152 @@ export default function MindMapsPanel({
 
   const saveNodesAndLinks = async (
     updatedNodes: MindMapNode[],
-    updatedLinks: Array<{ fromId: string; toId: string }>
+    updatedLinks: Array<{ fromId: string; toId: string }>,
+    currentSubMaps = subMaps
   ) => {
     setNodes(updatedNodes)
     setCustomLinks(updatedLinks)
+
+    if (navigationPath.length === 0) {
+      setRootNodes(updatedNodes)
+      setRootLinks(updatedLinks)
+    }
+
     if (mindMap) {
+      let finalNodes = navigationPath.length === 0 ? updatedNodes : rootNodes
+      let finalLinks = navigationPath.length === 0 ? updatedLinks : rootLinks
+      let finalSubMaps = currentSubMaps
+
+      if (navigationPath.length > 0) {
+        const activeParentId = navigationPath[navigationPath.length - 1].nodeId
+        finalSubMaps = {
+          ...currentSubMaps,
+          [activeParentId]: {
+            nodes: updatedNodes,
+            links: updatedLinks
+          }
+        }
+        setSubMaps(finalSubMaps)
+      }
+
       const payload = {
-        nodes: updatedNodes,
-        links: updatedLinks,
+        nodes: finalNodes,
+        links: finalLinks,
+        subMaps: finalSubMaps
       }
       await onSaveMindMap(mindMap.id, JSON.stringify(payload))
     }
   }
 
+  const handleDrillDown = async (nodeId: string, nodeTitle: string) => {
+    if (navigationPath.length === 0) {
+      setRootNodes(nodes)
+      setRootLinks(customLinks)
+    } else {
+      const activeParentId = navigationPath[navigationPath.length - 1].nodeId
+      setSubMaps((prev) => ({
+        ...prev,
+        [activeParentId]: {
+          nodes,
+          links: customLinks
+        }
+      }))
+    }
+
+    const newPath = [...navigationPath, { nodeId, nodeTitle }]
+    setNavigationPath(newPath)
+    
+    const targetData = subMaps[nodeId] || { nodes: [], links: [] }
+    let targetNodes = targetData.nodes
+    let targetLinks = targetData.links
+    
+    if (targetNodes.length === 0) {
+      targetNodes = [
+        {
+          id: `subroot_${nodeId}_${Date.now()}`,
+          parentId: null,
+          type: 'text',
+          title: nodeTitle,
+          text: 'Детальний опис теми та особливості її вивчення.',
+          x: 200,
+          y: 200
+        }
+      ]
+      
+      const updatedSubMaps = {
+        ...subMaps,
+        [nodeId]: {
+          nodes: targetNodes,
+          links: targetLinks
+        }
+      }
+      setSubMaps(updatedSubMaps)
+      
+      if (mindMap) {
+        const payload = {
+          nodes: navigationPath.length === 0 ? nodes : rootNodes,
+          links: navigationPath.length === 0 ? customLinks : rootLinks,
+          subMaps: updatedSubMaps
+        }
+        await onSaveMindMap(mindMap.id, JSON.stringify(payload))
+      }
+    }
+    
+    setNodes(targetNodes)
+    setCustomLinks(targetLinks)
+    setSelectedNodeId(null)
+    setLinkingSourceId(null)
+    setPanX(100)
+    setPanY(250)
+    setScale(1)
+  }
+
+  const handleNavigateBack = (targetPathIndex: number) => {
+    let updatedSubMaps = subMaps
+    if (navigationPath.length > 0) {
+      const activeParentId = navigationPath[navigationPath.length - 1].nodeId
+      updatedSubMaps = {
+        ...subMaps,
+        [activeParentId]: {
+          nodes,
+          links: customLinks
+        }
+      }
+      setSubMaps(updatedSubMaps)
+    }
+
+    if (targetPathIndex === -1) {
+      setNavigationPath([])
+      setNodes(rootNodes)
+      setCustomLinks(rootLinks)
+    } else {
+      const newPath = navigationPath.slice(0, targetPathIndex + 1)
+      setNavigationPath(newPath)
+      const parentNodeId = newPath[newPath.length - 1].nodeId
+      const targetData = updatedSubMaps[parentNodeId] || { nodes: [], links: [] }
+      setNodes(targetData.nodes)
+      setCustomLinks(targetData.links)
+    }
+    setSelectedNodeId(null)
+    setLinkingSourceId(null)
+    setPanX(100)
+    setPanY(250)
+    setScale(1)
+  }
+
   const handleTitleBlur = async () => {
     if (mindMap && mapTitle.trim() && mapTitle !== mindMap.title) {
       try {
+        let finalNodes = navigationPath.length === 0 ? nodes : rootNodes
+        let finalLinks = navigationPath.length === 0 ? customLinks : rootLinks
+        const payload = {
+          nodes: finalNodes,
+          links: finalLinks,
+          subMaps: subMaps
+        }
         await updateMindMap(mindMap.id, {
           title: mapTitle.trim(),
-          nodes_data: JSON.stringify({ nodes, links: customLinks }),
+          nodes_data: JSON.stringify(payload),
         })
         if (onRefreshData) {
           await onRefreshData()
@@ -356,7 +507,7 @@ export default function MindMapsPanel({
   }
 
   const nodeWidth = 280
-  const nodeHeight = 120
+  const nodeHeight = 160
 
   const getVisibleNodes = () => {
     const visibleList: MindMapNode[] = []
@@ -601,6 +752,33 @@ export default function MindMapsPanel({
           </div>
         </div>
 
+        {/* Navigation Breadcrumbs for nested study mindmaps */}
+        {navigationPath.length > 0 && (
+          <div className="mindmap-breadcrumbs">
+            <button
+              type="button"
+              className="mindmap-breadcrumbs-btn"
+              onClick={() => handleNavigateBack(-1)}
+            >
+              <Home size={13} />
+              <span>Коренева тема</span>
+            </button>
+            {navigationPath.map((pathItem, idx) => (
+              <React.Fragment key={pathItem.nodeId}>
+                <ChevronRight size={12} style={{ color: 'var(--muted)' }} />
+                <button
+                  type="button"
+                  className={`mindmap-breadcrumbs-btn ${idx === navigationPath.length - 1 ? 'active' : ''}`}
+                  onClick={() => handleNavigateBack(idx)}
+                  disabled={idx === navigationPath.length - 1}
+                >
+                  <span>{pathItem.nodeTitle}</span>
+                </button>
+              </React.Fragment>
+            ))}
+          </div>
+        )}
+
         <div className="mindmap-workspace-body">
           <div
             id="mindmap-viewport"
@@ -693,9 +871,10 @@ export default function MindMapsPanel({
                   <path
                     key={conn.id}
                     d={conn.path}
+                    className={conn.isSelected ? 'animated-path' : ''}
                     stroke={conn.isSelected ? '#a855f7' : '#3f3f46'}
                     strokeWidth={conn.isSelected ? 3 : 2}
-                    strokeDasharray={conn.isDashed ? '4,4' : undefined}
+                    strokeDasharray={conn.isDashed ? '4,4' : (conn.isSelected ? '8' : undefined)}
                     fill="none"
                     markerEnd={conn.isDashed ? undefined : (conn.isSelected ? 'url(#arrowhead-selected)' : 'url(#arrowhead)')}
                     style={{ transition: 'stroke 0.15s ease, stroke-width 0.15s ease' }}
@@ -953,6 +1132,20 @@ export default function MindMapsPanel({
                     </div>
 
                     {nodeContent}
+
+                    <button
+                      type="button"
+                      className="node-drilldown-btn"
+                      title="Детальне вивчення теми"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDrillDown(node.id, node.title || 'Тема')
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      <GitBranch size={11} />
+                      Детальне вивчення
+                    </button>
 
                     {childrenCount > 0 && (
                       <button

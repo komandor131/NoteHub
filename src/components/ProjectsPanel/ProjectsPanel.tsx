@@ -56,6 +56,7 @@ export default function ProjectsPanel({
   onQuickCreateSnippet,
   onSaveCanvas,
   onUpdateTask,
+  onDeleteTask,
   setSection,
   setSnippetSelection,
   openEditTask,
@@ -64,8 +65,52 @@ export default function ProjectsPanel({
 }: ProjectsPanelProps) {
   const project = projects.find((p) => p.id === selectedProjectId) ?? null
 
-  const [activeTab, setActiveTab] = useState<'workspace' | 'mindmap'>('workspace')
+  const [activeTab, setActiveTab] = useState<'workspace' | 'mindmap' | 'media'>('workspace')
   const [projectFilter, setProjectFilter] = useState<'active' | 'completed' | 'all'>('all')
+  
+  // Media Items State
+  const [mediaItems, setMediaItems] = useState<Array<{
+    id: string
+    title: string
+    type: 'image' | 'link'
+    url: string
+    note: string
+    fontStyle: 'sans' | 'serif' | 'mono' | 'cursive'
+    icon: string
+    createdAt: string
+  }>>([])
+
+  // Media Form States
+  const [newMediaTitle, setNewMediaTitle] = useState('')
+  const [newMediaType, setNewMediaType] = useState<'image' | 'link'>('image')
+  const [newMediaUrl, setNewMediaUrl] = useState('')
+  const [newMediaNote, setNewMediaNote] = useState('')
+  const [newMediaFont, setNewMediaFont] = useState<'sans' | 'serif' | 'mono' | 'cursive'>('sans')
+  const [newMediaIcon, setNewMediaIcon] = useState('🌟')
+
+  // Confirm Modal Config
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void | Promise<void>
+  } | null>(null)
+
+  // Batch selections
+  const [batchSelectedTaskIds, setBatchSelectedTaskIds] = useState<number[]>([])
+  const [batchSelectedNodeIds, setBatchSelectedNodeIds] = useState<string[]>([])
+
+  const askConfirmation = (title: string, message: string, onConfirm: () => void | Promise<void>) => {
+    setConfirmConfig({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: async () => {
+        await onConfirm()
+        setConfirmConfig(null)
+      }
+    })
+  }
   const [nodes, setNodes] = useState<Array<{
     id: string
     x: number
@@ -118,30 +163,43 @@ export default function ProjectsPanel({
       if (project.canvas_data) {
         try {
           const parsed = JSON.parse(project.canvas_data)
-          const mappedNodes = (parsed.nodes || []).map((n: any) => ({
-            id: n.id,
-            x: n.x,
-            y: n.y,
-            title: n.title || '',
-            text: n.text || '',
-            type: n.type || 'text',
-            taskId: n.taskId,
-            snippetId: n.snippetId,
-            isCompleted: !!n.isCompleted,
-            imageUrl: n.imageUrl,
-            linkUrl: n.linkUrl,
-            linkLabel: n.linkLabel,
-            fileId: n.fileId,
-          }))
+          const mappedNodes = (parsed.nodes || [])
+            .map((n: any) => ({
+              id: n.id,
+              x: n.x,
+              y: n.y,
+              title: n.title || '',
+              text: n.text || '',
+              type: n.type || 'text',
+              taskId: n.taskId,
+              snippetId: n.snippetId,
+              isCompleted: !!n.isCompleted,
+              imageUrl: n.imageUrl,
+              linkUrl: n.linkUrl,
+              linkLabel: n.linkLabel,
+              fileId: n.fileId,
+            }))
+            .filter((n: any) => {
+              if (n.type === 'task' && n.taskId) {
+                return tasks.some((t) => t.id === n.taskId)
+              }
+              if (n.type === 'snippet' && n.snippetId) {
+                return snippets.some((s) => s.id === n.snippetId)
+              }
+              return true
+            })
           setNodes(mappedNodes)
           setEdges(parsed.edges || [])
+          setMediaItems(parsed.mediaItems || [])
         } catch (err) {
           setNodes([])
           setEdges([])
+          setMediaItems([])
         }
       } else {
         setNodes([])
         setEdges([])
+        setMediaItems([])
       }
       setSelectedNodeId(null)
       setIsConnecting(false)
@@ -151,18 +209,28 @@ export default function ProjectsPanel({
       setCanvasScale(1)
       setIsCanvasDragging(false)
       setDraggingNodeId(null)
+      setBatchSelectedTaskIds([])
+      setBatchSelectedNodeIds([])
     } else {
       setNodes([])
       setEdges([])
+      setMediaItems([])
       setSelectedNodeId(null)
       setIsConnecting(false)
       setConnectingFromId(null)
     }
   }, [project?.id])
 
-  const autoSaveCanvas = async (updatedNodes: typeof nodes, updatedEdges: typeof edges) => {
+  const autoSaveCanvas = async (updatedNodes: typeof nodes, updatedEdges: typeof edges, updatedMedia = mediaItems) => {
     if (!project) return
-    const payload = JSON.stringify({ nodes: updatedNodes, edges: updatedEdges })
+    const payload = JSON.stringify({ nodes: updatedNodes, edges: updatedEdges, mediaItems: updatedMedia })
+    await onSaveCanvas(project.id, payload)
+  }
+
+  const handleSaveMediaItems = async (updatedMedia: typeof mediaItems) => {
+    if (!project) return
+    setMediaItems(updatedMedia)
+    const payload = JSON.stringify({ nodes, edges, mediaItems: updatedMedia })
     await onSaveCanvas(project.id, payload)
   }
 
@@ -550,18 +618,35 @@ export default function ProjectsPanel({
           >
             🗺️ Інтелект-карта
           </button>
+          <button
+            className={`btn ${activeTab === 'media' ? 'primary' : 'secondary'}`}
+            type="button"
+            onClick={() => setActiveTab('media')}
+          >
+            🖼️ Медіа & Нотатки
+          </button>
         </div>
         <div className="row-actions">
           <button className="btn secondary" onClick={() => onEditProject(project)}>
             Редагувати проєкт
           </button>
-          <button className="btn secondary" style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }} onClick={() => onDeleteProject(project)}>
+          <button
+            className="btn secondary"
+            style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}
+            onClick={() => {
+              askConfirmation(
+                'Видалити проєкт',
+                `Ви дійсно хочете видалити проєкт "${project.title}"? Це також відв'яже всі пов'язані задачі та корисний код.`,
+                () => onDeleteProject(project, true)
+              )
+            }}
+          >
             Видалити проєкт
           </button>
         </div>
       </div>
 
-      {activeTab === 'workspace' ? (
+      {activeTab === 'workspace' && (
         <div className="project-workspace-container">
           <div className="project-main-flow">
             <div className="project-section-card">
@@ -594,7 +679,6 @@ export default function ProjectsPanel({
               <p style={{ color: 'var(--muted)', fontSize: '13px', margin: '0 0 16px', lineHeight: 1.5 }}>
                 {project.description || 'Опис відсутній.'}
               </p>
-
               <div className="tech-stack-pills" style={{ marginTop: '12px' }}>
                 {project.tech_stack.map((tech) => (
                   <span className="tech-pill" style={{ fontSize: '11px', padding: '3px 8px' }} key={tech}>
@@ -608,87 +692,229 @@ export default function ProjectsPanel({
               {(() => {
                 const connectedNodeIds = new Set(edges.flatMap((edge) => [edge.from, edge.to]))
                 const connectedCanvasTasks = nodes.filter((node) => node.type === 'text' && connectedNodeIds.has(node.id))
+                
+                const hasSelections = batchSelectedTaskIds.length > 0 || batchSelectedNodeIds.length > 0
+                
                 return (
                   <>
-                    <h3>
+                    <h3 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 16px' }}>
                       <span>📋 Задачі проєкту ({projTasks.length + connectedCanvasTasks.length})</span>
                       <button className="btn secondary" style={{ minHeight: '26px', padding: '0 8px', fontSize: '11px' }} onClick={() => onQuickCreateTask(project.id)}>
                         <Plus size={12} /> Додати задачу
                       </button>
                     </h3>
 
-                    <div style={{ display: 'grid', gap: '8px' }}>
-                      {projTasks.map((task) => (
-                        <div
-                          key={task.id}
-                          className="project-link-item"
-                          style={{ background: '#09090b', padding: '8px 12px', opacity: task.status === 'done' ? 0.6 : 1 }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button
-                              type="button"
-                              className={`task-node-checkbox ${task.status === 'done' ? 'checked' : ''}`}
-                              onClick={async (e) => {
-                                e.stopPropagation()
-                                const nextStatus = task.status === 'done' ? 'todo' : 'done'
-                                await onUpdateTask(task.id, {
-                                  title: task.title,
-                                  description: task.description,
-                                  type: task.type,
-                                  status: nextStatus,
-                                  priority: task.priority,
-                                  startAt: task.startAt,
-                                  endAt: task.endAt,
-                                  dueDate: task.dueDate,
-                                  color: task.color,
-                                  tags: task.tags,
-                                  projectId: task.projectId,
-                                })
-                              }}
-                              onMouseDown={(e) => e.stopPropagation()}
-                            >
-                              {task.status === 'done' && <Check size={10} />}
-                            </button>
-                            <span className="task-dot" style={{ background: task.color, margin: 0, width: '8px', height: '8px' }} />
-                            <span style={{ textDecoration: task.status === 'done' ? 'line-through' : 'none', color: task.status === 'done' ? 'var(--muted)' : '#ffffff', fontWeight: 500 }}>
-                              {task.title}
-                            </span>
-                          </div>
-                          <span style={{ fontSize: '11px', color: 'var(--muted)', background: '#18181b', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                            {statusLabels[task.status]}
-                          </span>
+                    {/* Batch Actions Float Bar */}
+                    {hasSelections && (
+                      <div style={{
+                        background: 'rgba(168, 85, 247, 0.12)',
+                        border: '1px solid rgba(168, 85, 247, 0.3)',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        marginBottom: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px'
+                      }}>
+                        <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--pink-strong)' }}>
+                          Вибрано: {batchSelectedTaskIds.length + batchSelectedNodeIds.length}
+                        </span>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            className="btn primary"
+                            style={{ minHeight: '26px', padding: '0 10px', fontSize: '11px' }}
+                            onClick={() => {
+                              askConfirmation(
+                                'Виконати вибрані задачі',
+                                `Позначити ${batchSelectedTaskIds.length + batchSelectedNodeIds.length} вибраних задач як виконані?`,
+                                async () => {
+                                  for (const id of batchSelectedTaskIds) {
+                                    const t = tasks.find(x => x.id === id)
+                                    if (t) {
+                                      await onUpdateTask(t.id, { ...t, status: 'done' })
+                                    }
+                                  }
+                                  if (batchSelectedNodeIds.length > 0) {
+                                    const updated = nodes.map(n => batchSelectedNodeIds.includes(n.id) ? { ...n, isCompleted: true } : n)
+                                    setNodes(updated)
+                                    void autoSaveCanvas(updated, edges)
+                                  }
+                                  setBatchSelectedTaskIds([])
+                                  setBatchSelectedNodeIds([])
+                                }
+                              )
+                            }}
+                          >
+                            🟢 Виконано
+                          </button>
+                          <button
+                            type="button"
+                            className="btn danger"
+                            style={{ minHeight: '26px', padding: '0 10px', fontSize: '11px' }}
+                            onClick={() => {
+                              askConfirmation(
+                                'Видалити вибрані задачі',
+                                `Ви дійсно хочете назавжди видалити ${batchSelectedTaskIds.length + batchSelectedNodeIds.length} вибраних задач?`,
+                                async () => {
+                                  if (onDeleteTask) {
+                                    for (const id of batchSelectedTaskIds) {
+                                      const t = tasks.find(x => x.id === id)
+                                      if (t) {
+                                        await onDeleteTask(t, true)
+                                      }
+                                    }
+                                  }
+                                  if (batchSelectedNodeIds.length > 0) {
+                                    const updated = nodes.filter(n => !batchSelectedNodeIds.includes(n.id))
+                                    setNodes(updated)
+                                    const updatedEdges = edges.filter(e => !batchSelectedNodeIds.includes(e.from) && !batchSelectedNodeIds.includes(e.to))
+                                    setEdges(updatedEdges)
+                                    void autoSaveCanvas(updated, updatedEdges)
+                                  }
+                                  setBatchSelectedTaskIds([])
+                                  setBatchSelectedNodeIds([])
+                                }
+                              )
+                            }}
+                          >
+                            🗑️ Видалити
+                          </button>
                         </div>
-                      ))}
+                      </div>
+                    )}
 
-                      {connectedCanvasTasks.map((node) => (
-                        <div
-                          key={node.id}
-                          className="project-link-item"
-                          style={{ background: '#09090b', padding: '8px 12px', opacity: node.isCompleted ? 0.6 : 1 }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button
-                              type="button"
-                              className={`task-node-checkbox ${node.isCompleted ? 'checked' : ''}`}
-                              onClick={async (e) => {
-                                e.stopPropagation()
-                                const updated = nodes.map((n) => n.id === node.id ? { ...n, isCompleted: !n.isCompleted } : n)
-                                setNodes(updated)
-                                void autoSaveCanvas(updated, edges)
-                              }}
-                              onMouseDown={(e) => e.stopPropagation()}
-                            >
-                              {node.isCompleted && <Check size={10} />}
-                            </button>
-                            <span style={{ textDecoration: node.isCompleted ? 'line-through' : 'none', color: node.isCompleted ? 'var(--muted)' : '#ffffff', fontWeight: 500 }}>
-                              {node.title || 'Нова нотатка'}
+                    <div style={{ display: 'grid', gap: '8px' }}>
+                      {projTasks.map((task) => {
+                        const isBatchChecked = batchSelectedTaskIds.includes(task.id)
+                        return (
+                          <div
+                            key={task.id}
+                            className="project-link-item"
+                            style={{
+                              background: isBatchChecked ? 'rgba(168, 85, 247, 0.04)' : '#09090b',
+                              borderColor: isBatchChecked ? 'rgba(168, 85, 247, 0.25)' : 'var(--border)',
+                              padding: '8px 12px',
+                              opacity: task.status === 'done' ? 0.6 : 1
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, overflow: 'hidden' }}>
+                              {/* Batch Selection Checkbox */}
+                              <input
+                                type="checkbox"
+                                checked={isBatchChecked}
+                                onChange={(e) => {
+                                  e.stopPropagation()
+                                  if (e.target.checked) {
+                                    setBatchSelectedTaskIds([...batchSelectedTaskIds, task.id])
+                                  } else {
+                                    setBatchSelectedTaskIds(batchSelectedTaskIds.filter(id => id !== task.id))
+                                  }
+                                }}
+                                style={{ width: '15px', height: '15px', cursor: 'pointer', marginRight: '4px' }}
+                              />
+                              <button
+                                type="button"
+                                className={`task-node-checkbox ${task.status === 'done' ? 'checked' : ''}`}
+                                onClick={async (e) => {
+                                  e.stopPropagation()
+                                  const nextStatus = task.status === 'done' ? 'todo' : 'done'
+                                  await onUpdateTask(task.id, {
+                                    title: task.title,
+                                    description: task.description,
+                                    type: task.type,
+                                    status: nextStatus,
+                                    priority: task.priority,
+                                    startAt: task.startAt,
+                                    endAt: task.endAt,
+                                    dueDate: task.dueDate,
+                                    color: task.color,
+                                    tags: task.tags,
+                                    projectId: task.projectId,
+                                  })
+                                }}
+                                onMouseDown={(e) => e.stopPropagation()}
+                              >
+                                {task.status === 'done' && <Check size={10} />}
+                              </button>
+                              <span className="task-dot" style={{ background: task.color, margin: 0, width: '8px', height: '8px' }} />
+                              <span style={{
+                                textDecoration: task.status === 'done' ? 'line-through' : 'none',
+                                color: task.status === 'done' ? 'var(--muted)' : '#ffffff',
+                                fontWeight: 500,
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden'
+                              }}>
+                                {task.title}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '11px', color: 'var(--muted)', background: '#18181b', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                              {statusLabels[task.status]}
                             </span>
                           </div>
-                          <span style={{ fontSize: '11px', color: 'var(--muted)', background: '#18181b', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                            🗺️ Карта
-                          </span>
-                        </div>
-                      ))}
+                        )
+                      })}
+
+                      {connectedCanvasTasks.map((node) => {
+                        const isBatchChecked = batchSelectedNodeIds.includes(node.id)
+                        return (
+                          <div
+                            key={node.id}
+                            className="project-link-item"
+                            style={{
+                              background: isBatchChecked ? 'rgba(168, 85, 247, 0.04)' : '#09090b',
+                              borderColor: isBatchChecked ? 'rgba(168, 85, 247, 0.25)' : 'var(--border)',
+                              padding: '8px 12px',
+                              opacity: node.isCompleted ? 0.6 : 1
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, overflow: 'hidden' }}>
+                              {/* Batch Selection Checkbox */}
+                              <input
+                                type="checkbox"
+                                checked={isBatchChecked}
+                                onChange={(e) => {
+                                  e.stopPropagation()
+                                  if (e.target.checked) {
+                                    setBatchSelectedNodeIds([...batchSelectedNodeIds, node.id])
+                                  } else {
+                                    setBatchSelectedNodeIds(batchSelectedNodeIds.filter(id => id !== node.id))
+                                  }
+                                }}
+                                style={{ width: '15px', height: '15px', cursor: 'pointer', marginRight: '4px' }}
+                              />
+                              <button
+                                type="button"
+                                className={`task-node-checkbox ${node.isCompleted ? 'checked' : ''}`}
+                                onClick={async (e) => {
+                                  e.stopPropagation()
+                                  const updated = nodes.map((n) => n.id === node.id ? { ...n, isCompleted: !n.isCompleted } : n)
+                                  setNodes(updated)
+                                  void autoSaveCanvas(updated, edges)
+                                }}
+                                onMouseDown={(e) => e.stopPropagation()}
+                              >
+                                {node.isCompleted && <Check size={10} />}
+                              </button>
+                              <span style={{
+                                textDecoration: node.isCompleted ? 'line-through' : 'none',
+                                color: node.isCompleted ? 'var(--muted)' : '#ffffff',
+                                fontWeight: 500,
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden'
+                              }}>
+                                {node.title || 'Нова нотатка'}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '11px', color: 'var(--muted)', background: '#18181b', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                              🗺️ Карта
+                            </span>
+                          </div>
+                        )
+                      })}
 
                       {!projTasks.length && !connectedCanvasTasks.length && (
                         <p style={{ color: 'var(--muted)', fontSize: '12.5px', margin: 0, textAlign: 'center', padding: '12px' }}>
@@ -776,7 +1002,9 @@ export default function ProjectsPanel({
             </div>
           </div>
         </div>
-      ) : (
+      )}
+
+      {activeTab === 'mindmap' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '20px', marginTop: '16px' }}>
           {/* Canvas Container */}
           <div
@@ -1601,6 +1829,172 @@ export default function ProjectsPanel({
                 Оберіть вузол на карті, щоб редагувати його властивості.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Media & Notes Board Tab */}
+      {activeTab === 'media' && (
+        <div className={styles.mediaTabWrapper}>
+          <div className={styles.mediaFormCard}>
+            <h3>🖼️ Додати медіа-нотатку</h3>
+            <form onSubmit={async (e) => {
+              e.preventDefault()
+              if (!newMediaTitle.trim()) return
+              const newItem = {
+                id: String(Date.now()),
+                title: newMediaTitle,
+                type: newMediaType,
+                url: newMediaUrl,
+                note: newMediaNote,
+                fontStyle: newMediaFont,
+                icon: newMediaIcon,
+                createdAt: new Date().toISOString()
+              }
+              const updated = [...mediaItems, newItem]
+              await handleSaveMediaItems(updated)
+              setNewMediaTitle('')
+              setNewMediaUrl('')
+              setNewMediaNote('')
+              setNewMediaFont('sans')
+              setNewMediaIcon('🌟')
+            }} className={styles.mediaForm}>
+              <div className={styles.formRow}>
+                <label className={styles.formLabel}>
+                  <span>Назва</span>
+                  <input value={newMediaTitle} onChange={(e) => setNewMediaTitle(e.target.value)} required placeholder="Назва нотатки..." />
+                </label>
+                <label className={styles.formLabel}>
+                  <span>Тип</span>
+                  <select value={newMediaType} onChange={(e) => setNewMediaType(e.target.value as 'image' | 'link')}>
+                    <option value="image">Зображення (URL)</option>
+                    <option value="link">Посилання (URL)</option>
+                  </select>
+                </label>
+              </div>
+              <div className={styles.formRow}>
+                <label className={styles.formLabel}>
+                  <span>Адреса URL</span>
+                  <input value={newMediaUrl} onChange={(e) => setNewMediaUrl(e.target.value)} placeholder={newMediaType === 'image' ? 'https://example.com/photo.jpg' : 'https://example.com'} />
+                </label>
+                <label className={styles.formLabel}>
+                  <span>Іконка</span>
+                  <select value={newMediaIcon} onChange={(e) => setNewMediaIcon(e.target.value)}>
+                    <option value="🌟">🌟 Зірка</option>
+                    <option value="🎨">🎨 Дизайн</option>
+                    <option value="🚀">🚀 Проєкт</option>
+                    <option value="💡">💡 Ідея</option>
+                    <option value="🔑">🔑 Ключ</option>
+                    <option value="📎">📎 Скріпка</option>
+                    <option value="🗺️">🗺️ Карта</option>
+                  </select>
+                </label>
+              </div>
+              <div className={styles.formRow}>
+                <label className={styles.formLabel}>
+                  <span>Шрифт</span>
+                  <select value={newMediaFont} onChange={(e) => setNewMediaFont(e.target.value as any)}>
+                    <option value="sans">Без засічок (Sans)</option>
+                    <option value="serif">Класичний (Serif)</option>
+                    <option value="mono">Моноширинний (Mono)</option>
+                    <option value="cursive">Курсив (Cursive)</option>
+                  </select>
+                </label>
+              </div>
+              <label className={styles.formLabel}>
+                <span>Опис / Замітка</span>
+                <textarea value={newMediaNote} onChange={(e) => setNewMediaNote(e.target.value)} rows={3} placeholder="Введіть текст замітки..." />
+              </label>
+              <button type="submit" className="btn primary" style={{ marginTop: '8px' }}>
+                Додати на дошку
+              </button>
+            </form>
+          </div>
+
+          <div className={styles.mediaGrid}>
+            {mediaItems.map((item) => (
+              <div key={item.id} className={styles.mediaCard}>
+                {item.type === 'image' && item.url && (
+                  <div className={styles.cardImageWrapper}>
+                    <img src={item.url} alt={item.title} className={styles.cardImage} onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800'
+                    }} />
+                  </div>
+                )}
+                {item.type === 'link' && (
+                  <div className={styles.cardLinkWrapper}>
+                    <ExternalLink size={32} style={{ color: 'var(--pink-strong)' }} />
+                    {item.url && (
+                      <a href={item.url} target="_blank" rel="noreferrer" className={styles.cardLinkBtn}>
+                        Перейти за посиланням
+                      </a>
+                    )}
+                  </div>
+                )}
+                <div className={styles.cardContent}>
+                  <div className={styles.cardHeader}>
+                    <h4 className={styles.cardTitle}>
+                      <span style={{ marginRight: '6px' }}>{item.icon}</span>
+                      {item.title}
+                    </h4>
+                    <button type="button" className="icon-btn danger" style={{ padding: 4 }} onClick={() => {
+                      askConfirmation(
+                        'Видалити медіа-нотатку',
+                        `Ви дійсно хочете видалити медіа-нотатку "${item.title}"?`,
+                        async () => {
+                          const updated = mediaItems.filter(x => x.id !== item.id)
+                          await handleSaveMediaItems(updated)
+                        }
+                      )
+                    }}>
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                  {item.note && (
+                    <p className={`${styles.cardNote} ${
+                      item.fontStyle === 'serif' ? styles.fontSerif :
+                      item.fontStyle === 'mono' ? styles.fontMono :
+                      item.fontStyle === 'cursive' ? styles.fontCursive :
+                      styles.fontSans
+                    }`}>
+                      {item.note}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+            {mediaItems.length === 0 && (
+              <div className={styles.emptyMedia}>
+                🖼️ Дошка медіа порожня. Додайте перші посилання чи зображення з нотатками вище!
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Reusable custom confirmation modal overlay */}
+      {confirmConfig?.isOpen && (
+        <div className={styles.confirmOverlay}>
+          <div className={styles.confirmCard}>
+            <h3 className={styles.confirmTitle}>{confirmConfig.title}</h3>
+            <p className={styles.confirmMessage}>{confirmConfig.message}</p>
+            <div className={styles.confirmActions}>
+              <button className="btn secondary" type="button" onClick={() => setConfirmConfig(null)}>
+                Скасувати
+              </button>
+              <button
+                className="btn danger"
+                type="button"
+                onClick={async () => {
+                  if (confirmConfig.onConfirm) {
+                    await confirmConfig.onConfirm()
+                  }
+                  setConfirmConfig(null)
+                }}
+              >
+                Підтвердити
+              </button>
+            </div>
           </div>
         </div>
       )}

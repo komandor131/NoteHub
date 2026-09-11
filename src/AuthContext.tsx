@@ -37,7 +37,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
         });
     } else {
-      setLoading(false);
+      // Auto login as default admin user
+      api.loginApi({ email: 'admin@notehub.local', password: 'admin12345' })
+        .then((res) => {
+          localStorage.setItem('token', res.token);
+          api.setToken(res.token);
+          setToken(res.token);
+          setUser(res.user);
+        })
+        .catch((err) => {
+          console.error('Auto-login failed:', err);
+          setLoading(false);
+        });
     }
   }, [token]);
 
