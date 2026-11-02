@@ -7,8 +7,9 @@ import initSqlJs, {
   type SqlJsStatic,
   type SqlValue,
 } from 'sql.js'
+import { DEFAULT_FORMULAS } from './defaultFormulas.ts'
 
-export type EntityType = 'task' | 'snippet' | 'goal' | 'diary' | 'project' | 'mindmap' | 'roadmap'
+export type EntityType = 'task' | 'snippet' | 'goal' | 'diary' | 'project' | 'mindmap' | 'roadmap' | 'formula'
 export type UserRole = 'admin' | 'user'
 export type TaskType = 'task' | 'event' | 'deadline' | 'note'
 export type TaskStatus = 'todo' | 'in-progress' | 'done' | 'archived'
@@ -196,6 +197,7 @@ export interface RoadmapRecord {
   title: string
   description: string
   canvas_data: string
+  category?: string
   createdAt: string
   updatedAt: string
 }
@@ -204,6 +206,7 @@ export interface RoadmapInput {
   title: string
   description: string
   canvas_data?: string
+  category?: string
 }
 
 export interface HabitRecord {
@@ -274,6 +277,47 @@ export interface SnippetInput {
   projectId?: number | null
 }
 
+export interface FormulaVariableRecord {
+  name: string
+  label?: string
+  defaultValue: number | string
+  type?: 'number' | 'vector' | 'matrix'
+  min?: number
+  max?: number
+  step?: number
+  unit?: string
+  description?: string
+}
+
+export interface FormulaRecord {
+  id: number
+  ownerId: number
+  title: string
+  category: string
+  latex: string
+  expression: string
+  variables: FormulaVariableRecord[]
+  description: string
+  example?: string
+  tags: string[]
+  isFavorite: boolean
+  attachments: AttachmentRecord[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface FormulaInput {
+  title: string
+  category: string
+  latex: string
+  expression: string
+  variables: FormulaVariableRecord[]
+  description: string
+  example?: string
+  tags: string[]
+  isFavorite?: boolean
+}
+
 type Row = Record<string, SqlValue>
 
 const dataDir = path.join(process.cwd(), 'database')
@@ -298,6 +342,7 @@ export async function initDatabase() {
   const admin = seedDefaultUsers()
   claimUnownedRecords(admin.id)
   seedIfEmpty(admin.id)
+  seedFormulas(admin.id)
   seedStudyContent()
   persist()
 }
@@ -530,6 +575,163 @@ export function deleteSnippet(userId: number, id: number) {
   run('DELETE FROM snippet_tags WHERE snippetId = ?', [id])
   run('DELETE FROM snippets WHERE id = ? AND ownerId = ?', [id, userId])
   persist()
+}
+
+export function listFormulas(userId: number, filters: URLSearchParams = new URLSearchParams()) {
+  let formulas = all<FormulaRecord>(
+    'SELECT * FROM formulas WHERE ownerId = ? OR ownerId IS NULL ORDER BY isFavorite DESC, updatedAt DESC',
+    [userId],
+    mapFormula,
+  )
+  const query = filters.get('q')?.trim().toLowerCase()
+  const category = filters.get('category')?.trim().toLowerCase()
+  const tag = filters.get('tag')?.trim().toLowerCase()
+  const onlyFavorites = filters.get('favorites') === 'true'
+
+  if (query) {
+    formulas = formulas.filter((f) =>
+      `${f.title} ${f.category} ${f.description} ${f.expression} ${f.latex} ${f.tags.join(' ')}`
+        .toLowerCase()
+        .includes(query),
+    )
+  }
+  if (category && category !== 'all') {
+    formulas = formulas.filter((f) => f.category.toLowerCase() === category)
+  }
+  if (tag && tag !== 'all') {
+    formulas = formulas.filter((f) => f.tags.some((t) => t.toLowerCase() === tag))
+  }
+  if (onlyFavorites) {
+    formulas = formulas.filter((f) => f.isFavorite)
+  }
+
+  return formulas
+}
+
+export function getFormula(userId: number, id: number) {
+  return one<FormulaRecord>('SELECT * FROM formulas WHERE id = ? AND (ownerId = ? OR ownerId IS NULL)', [id, userId], mapFormula)
+}
+
+export function createFormula(userId: number, input: FormulaInput) {
+  const now = new Date().toISOString()
+  const varsJson = JSON.stringify(input.variables || [])
+  run(
+    `INSERT INTO formulas (ownerId, title, category, latex, expression, variables, description, example, isFavorite, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      userId,
+      input.title,
+      input.category || 'algebra',
+      input.latex || '',
+      input.expression || '',
+      varsJson,
+      input.description || '',
+      input.example || '',
+      input.isFavorite ? 1 : 0,
+      now,
+      now,
+    ],
+  )
+  const id = lastInsertId()
+  replaceTags('formula', id, input.tags || [])
+  persist()
+  return getFormula(userId, id)
+}
+
+export function updateFormula(userId: number, id: number, input: FormulaInput) {
+  const now = new Date().toISOString()
+  const varsJson = JSON.stringify(input.variables || [])
+  run(
+    `UPDATE formulas
+      SET title = ?, category = ?, latex = ?, expression = ?, variables = ?, description = ?, example = ?, isFavorite = ?, updatedAt = ?
+      WHERE id = ? AND (ownerId = ? OR ownerId IS NULL)`,
+    [
+      input.title,
+      input.category || 'algebra',
+      input.latex || '',
+      input.expression || '',
+      varsJson,
+      input.description || '',
+      input.example || '',
+      input.isFavorite ? 1 : 0,
+      now,
+      id,
+      userId,
+    ],
+  )
+  replaceTags('formula', id, input.tags || [])
+  persist()
+  return getFormula(userId, id)
+}
+
+export function deleteFormula(userId: number, id: number) {
+  deleteEntityAttachments(userId, 'formula', id)
+  run('DELETE FROM formula_tags WHERE formulaId = ?', [id])
+  run('DELETE FROM formulas WHERE id = ? AND (ownerId = ? OR ownerId IS NULL)', [id, userId])
+  persist()
+}
+
+export function toggleFavoriteFormula(userId: number, id: number) {
+  const current = getFormula(userId, id)
+  if (!current) return null
+  const newFav = current.isFavorite ? 0 : 1
+  run('UPDATE formulas SET isFavorite = ?, updatedAt = ? WHERE id = ?', [newFav, new Date().toISOString(), id])
+  persist()
+  return getFormula(userId, id)
+}
+
+export function normalizeFormulaInput(body: unknown): FormulaInput {
+  const object = asObject(body)
+  let vars: FormulaVariableRecord[] = []
+  if (Array.isArray(object.variables)) {
+    vars = object.variables.map((v: any) => ({
+      name: String(v.name || ''),
+      label: v.label ? String(v.label) : undefined,
+      defaultValue: v.defaultValue !== undefined ? v.defaultValue : 0,
+      type: v.type || 'number',
+      min: v.min !== undefined && v.min !== null && v.min !== '' ? Number(v.min) : undefined,
+      max: v.max !== undefined && v.max !== null && v.max !== '' ? Number(v.max) : undefined,
+      step: v.step !== undefined && v.step !== null && v.step !== '' ? Number(v.step) : undefined,
+      unit: v.unit ? String(v.unit) : undefined,
+      description: v.description ? String(v.description) : undefined,
+    }))
+  }
+  return {
+    title: requiredText(object.title, 'Formula title is required'),
+    category: optionalText(object.category) || 'algebra',
+    latex: optionalText(object.latex) || '',
+    expression: optionalText(object.expression) || '',
+    variables: vars,
+    description: optionalText(object.description) || '',
+    example: optionalText(object.example) || '',
+    tags: normalizeTags(object.tags),
+    isFavorite: Boolean(object.isFavorite),
+  }
+}
+
+export function seedFormulas(adminUserId: number) {
+  const existing = one<{ count: number }>(
+    'SELECT COUNT(*) as count FROM formulas',
+    [],
+    (row) => ({ count: numberValue(row.count) }),
+  )
+  if (!existing || existing.count === 0) {
+    console.log('Seeding pre-built formulas vault...')
+    for (const f of DEFAULT_FORMULAS) {
+      createFormula(adminUserId, {
+        title: f.title,
+        category: f.category,
+        latex: f.latex,
+        expression: f.expression,
+        variables: f.variables,
+        description: f.description,
+        example: f.example,
+        tags: f.tags,
+        isFavorite: f.isFavorite,
+      })
+    }
+    persist()
+  }
 }
 
 export function listAttachments(userId: number, entityType?: EntityType, entityId?: number) {
@@ -845,6 +1047,31 @@ function migrate() {
     );
   `)
 
+  run(`
+    CREATE TABLE IF NOT EXISTS formulas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ownerId INTEGER,
+      title TEXT NOT NULL,
+      category TEXT NOT NULL,
+      latex TEXT NOT NULL DEFAULT '',
+      expression TEXT NOT NULL DEFAULT '',
+      variables TEXT NOT NULL DEFAULT '[]',
+      description TEXT NOT NULL DEFAULT '',
+      example TEXT NOT NULL DEFAULT '',
+      isFavorite INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+  `)
+
+  run(`
+    CREATE TABLE IF NOT EXISTS formula_tags (
+      formulaId INTEGER NOT NULL,
+      tagId INTEGER NOT NULL,
+      PRIMARY KEY (formulaId, tagId)
+    );
+  `)
+
   // Safely alter existing tables to add columns if they don't exist
   try {
     run(`ALTER TABLE tasks ADD COLUMN projectId INTEGER;`)
@@ -881,6 +1108,7 @@ function migrate() {
     'habits',
     'mindmaps',
     'roadmaps',
+    'formulas',
   ]) {
     addColumnIfMissing(table, 'ownerId', 'INTEGER')
   }
@@ -1011,6 +1239,7 @@ function claimUnownedRecords(adminUserId: number) {
     'habits',
     'mindmaps',
     'roadmaps',
+    'formulas',
   ]) {
     run(`UPDATE ${table} SET ownerId = ? WHERE ownerId IS NULL OR ownerId = 0`, [adminUserId])
   }
@@ -4053,11 +4282,40 @@ function mapSnippet(row: Row): SnippetRecord {
   }
 }
 
+function mapFormula(row: Row): FormulaRecord {
+  const id = numberValue(row.id)
+  const ownerId = numberValue(row.ownerId)
+  let variables: FormulaVariableRecord[] = []
+  try {
+    variables = JSON.parse(textValue(row.variables))
+  } catch {
+    variables = []
+  }
+  return {
+    id,
+    ownerId,
+    title: textValue(row.title),
+    category: textValue(row.category) || 'algebra',
+    latex: textValue(row.latex),
+    expression: textValue(row.expression),
+    variables,
+    description: textValue(row.description),
+    example: textValue(row.example),
+    tags: getTags('formula', id),
+    isFavorite: numberValue(row.isFavorite) === 1,
+    attachments: listAttachments(ownerId, 'formula', id),
+    createdAt: textValue(row.createdAt),
+    updatedAt: textValue(row.updatedAt),
+  }
+}
+
 function mapAttachment(row: Row): AttachmentRecord {
   const rawType = textValue(row.entityType)
   const entityType: EntityType =
     rawType === 'snippet'
       ? 'snippet'
+      : rawType === 'formula'
+        ? 'formula'
       : rawType === 'goal'
         ? 'goal'
         : rawType === 'diary'
@@ -4082,8 +4340,8 @@ function mapAttachment(row: Row): AttachmentRecord {
 }
 
 function getTags(entityType: EntityType, entityId: number) {
-  const table = entityType === 'task' ? 'task_tags' : 'snippet_tags'
-  const idColumn = entityType === 'task' ? 'taskId' : 'snippetId'
+  const table = entityType === 'task' ? 'task_tags' : entityType === 'formula' ? 'formula_tags' : 'snippet_tags'
+  const idColumn = entityType === 'task' ? 'taskId' : entityType === 'formula' ? 'formulaId' : 'snippetId'
   return all<string>(
     `SELECT tags.name FROM tags
       JOIN ${table} ON ${table}.tagId = tags.id
@@ -4095,8 +4353,8 @@ function getTags(entityType: EntityType, entityId: number) {
 }
 
 function replaceTags(entityType: EntityType, entityId: number, tags: string[]) {
-  const table = entityType === 'task' ? 'task_tags' : 'snippet_tags'
-  const idColumn = entityType === 'task' ? 'taskId' : 'snippetId'
+  const table = entityType === 'task' ? 'task_tags' : entityType === 'formula' ? 'formula_tags' : 'snippet_tags'
+  const idColumn = entityType === 'task' ? 'taskId' : entityType === 'formula' ? 'formulaId' : 'snippetId'
   run(`DELETE FROM ${table} WHERE ${idColumn} = ?`, [entityId])
 
   for (const tag of tags) {
@@ -4789,8 +5047,8 @@ export function getRoadmap(_userId: number, id: number) {
 export function createRoadmap(userId: number, input: RoadmapInput) {
   const now = new Date().toISOString()
   run(
-    'INSERT INTO roadmaps (ownerId, title, description, canvas_data, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)',
-    [userId, input.title, input.description, input.canvas_data || '{}', now, now]
+    'INSERT INTO roadmaps (ownerId, title, description, canvas_data, category, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [userId, input.title, input.description, input.canvas_data || '{}', input.category || 'learning', now, now]
   )
   const id = lastInsertId()
   persist()
@@ -4800,8 +5058,8 @@ export function createRoadmap(userId: number, input: RoadmapInput) {
 export function updateRoadmap(userId: number, id: number, input: RoadmapInput) {
   const now = new Date().toISOString()
   run(
-    'UPDATE roadmaps SET title = ?, description = ?, canvas_data = ?, updatedAt = ? WHERE id = ? AND ownerId = ?',
-    [input.title, input.description, input.canvas_data || '{}', now, id, userId]
+    'UPDATE roadmaps SET title = ?, description = ?, canvas_data = ?, category = ?, updatedAt = ? WHERE id = ? AND ownerId = ?',
+    [input.title, input.description, input.canvas_data || '{}', input.category || 'learning', now, id, userId]
   )
   persist()
   return getRoadmap(userId, id)
@@ -4818,6 +5076,7 @@ function mapRoadmap(row: Row): RoadmapRecord {
     title: textValue(row.title),
     description: textValue(row.description),
     canvas_data: textValue(row.canvas_data) || '{}',
+    category: textValue(row.category) || 'learning',
     createdAt: textValue(row.createdAt),
     updatedAt: textValue(row.updatedAt),
   }
@@ -4829,6 +5088,7 @@ export function normalizeRoadmapInput(body: unknown): RoadmapInput {
     title: requiredText(object.title, 'Roadmap title is required'),
     description: optionalText(object.description),
     canvas_data: typeof object.canvas_data === 'string' ? object.canvas_data.trim() : '{}',
+    category: typeof object.category === 'string' ? object.category.trim() : 'learning',
   }
 }
 

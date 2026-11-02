@@ -90,12 +90,21 @@ import {
   registerUser,
   loginUser,
   logoutSession,
+  listFormulas,
+  getFormula,
+  createFormula,
+  updateFormula,
+  deleteFormula,
+  toggleFavoriteFormula,
+  normalizeFormulaInput,
 } from './database.ts'
 import { randomUUID } from 'node:crypto'
 import cors from 'cors'
 import express, { type NextFunction, type Request, type Response } from 'express'
 import multer from 'multer'
 import { mathNotes } from './mathNotes.ts'
+import { getUniversityNote } from './universityNotes.ts'
+import { getEnglishNote } from './englishNotes.ts'
 import { authMiddleware } from './authMiddleware.ts'
 
 const port = Number(process.env.PORT ?? 5174)
@@ -258,6 +267,8 @@ app.post('/api/attachments', upload.single('file'), (request, response) => {
       ? getTask(request.user!.id, entityId)
       : entityType === 'snippet'
         ? getSnippet(request.user!.id, entityId)
+        : entityType === 'formula'
+          ? getFormula(request.user!.id, entityId)
         : entityType === 'goal'
           ? getGoal(request.user!.id, entityId)
           : entityType === 'diary'
@@ -748,8 +759,14 @@ app.get('/api/roadmaps/notes/:nodeId', (request, response) => {
     const mappedKey = findNoteKey(nodeId)
     if (mappedKey && mathNotes[mappedKey]) {
       notes = mathNotes[mappedKey]
+    } else if (mathNotes[nodeId]) {
+      notes = mathNotes[nodeId]
+    } else if (nodeId.toLowerCase().startsWith('eng') || (request.query.title && /англ|english/i.test(String(request.query.title)))) {
+      const title = request.query.title ? String(request.query.title) : undefined
+      notes = getEnglishNote(nodeId, title)
     } else {
-      notes = mathNotes[nodeId] || null
+      const title = request.query.title ? String(request.query.title) : undefined
+      notes = getUniversityNote(nodeId, title)
     }
   }
 
@@ -836,6 +853,57 @@ app.delete('/api/study/flashcards/:id', (request, response) => {
   deleteFlashcard(userId, id)
   response.status(204).end()
 })
+
+app.get('/api/formulas', (request, response) => {
+  response.json(listFormulas(request.user!.id, toSearchParams(request)))
+})
+
+app.post('/api/formulas', (request, response) => {
+  const formula = createFormula(request.user!.id, normalizeFormulaInput(request.body))
+  response.status(201).json(formula)
+})
+
+app.get('/api/formulas/:id', (request, response) => {
+  const id = parseId(request.params.id)
+  const formula = getFormula(request.user!.id, id)
+  if (!formula) {
+    response.status(404).json({ error: 'Formula not found' })
+    return
+  }
+  response.json(formula)
+})
+
+app.put('/api/formulas/:id', (request, response) => {
+  const id = parseId(request.params.id)
+  if (!getFormula(request.user!.id, id)) {
+    response.status(404).json({ error: 'Formula not found' })
+    return
+  }
+  response.json(updateFormula(request.user!.id, id, normalizeFormulaInput(request.body)))
+})
+
+app.delete('/api/formulas/:id', (request, response) => {
+  const id = parseId(request.params.id)
+  if (!getFormula(request.user!.id, id)) {
+    response.status(404).json({ error: 'Formula not found' })
+    return
+  }
+  const attachments = listAttachments(request.user!.id, 'formula', id)
+  deleteFormula(request.user!.id, id)
+  attachments.forEach((attachment) => removeUploadedFile(attachment.storedName))
+  response.status(204).end()
+})
+
+app.post('/api/formulas/:id/favorite', (request, response) => {
+  const id = parseId(request.params.id)
+  const formula = toggleFavoriteFormula(request.user!.id, id)
+  if (!formula) {
+    response.status(404).json({ error: 'Formula not found' })
+    return
+  }
+  response.json(formula)
+})
+
 
 // Quizzes API
 app.get('/api/study/quizzes', (request, response) => {
@@ -977,3 +1045,5 @@ function removeUploadedFile(storedName: string | undefined) {
 
 
 
+
+// reload 1790986938017

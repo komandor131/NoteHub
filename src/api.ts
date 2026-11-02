@@ -23,6 +23,8 @@ import type {
   StudyCourse,
   StudyModule,
   StudyLesson,
+  Formula,
+  FormulaPayload,
 } from './types'
 
 const jsonHeaders = {
@@ -394,6 +396,37 @@ export async function createLesson(moduleId: number, payload: { title: string; k
     method: 'POST',
     headers: jsonHeaders,
     body: JSON.stringify(payload)
+  })
+}
+
+// --- Formulas API ---
+export async function fetchFormulas(params?: URLSearchParams) {
+  return request<Formula[]>(`/api/formulas${queryString(params)}`)
+}
+
+export async function createFormula(payload: FormulaPayload) {
+  return request<Formula>('/api/formulas', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateFormula(id: number, payload: FormulaPayload) {
+  return request<Formula>(`/api/formulas/${id}`, {
+    method: 'PUT',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteFormula(id: number) {
+  await request<void>(`/api/formulas/${id}`, { method: 'DELETE' })
+}
+
+export async function toggleFormulaFavorite(id: number) {
+  return request<Formula>(`/api/formulas/${id}/favorite`, {
+    method: 'POST',
   })
 }
 

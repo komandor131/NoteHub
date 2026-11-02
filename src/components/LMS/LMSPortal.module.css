@@ -1,0 +1,819 @@
+/* NoteHub LMS Portal Styles - Strictly Montserrat Typography & Exact GoIT LMS Colors */
+
+.lmsRoot {
+  font-family: 'Montserrat', sans-serif !important;
+  background-color: #27272c;
+  color: #e1e1e4;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.lmsRoot * {
+  font-family: 'Montserrat', sans-serif !important;
+  box-sizing: border-box;
+}
+
+/* ================= TOPBAR ================= */
+.topbar {
+  height: 56px;
+  background: #2c2c2f;
+  border-bottom: 1px solid #37373d;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.topbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brandLogo {
+  background: #ffffff;
+  color: #111111;
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+  cursor: pointer;
+}
+
+.brandLogo span {
+  font-weight: 900;
+  color: #111111;
+}
+
+.homeIconBtn {
+  background: transparent;
+  border: none;
+  color: #9a9a9f;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  transition: color 0.15s;
+}
+
+.homeIconBtn:hover {
+  color: #ffffff;
+}
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: #9a9a9f;
+}
+
+.breadcrumbArrow {
+  color: #707075;
+  font-size: 12px;
+}
+
+.breadcrumbLink {
+  cursor: pointer;
+  color: #9a9a9f;
+  transition: color 0.15s;
+}
+
+.breadcrumbLink:hover {
+  color: #ffffff;
+}
+
+.breadcrumbCourse {
+  color: #e1e1e4;
+  font-weight: 500;
+}
+
+/* Discipline Dropdown Selector Pill */
+.disciplineSelectorWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.disciplineSelectorBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #37373d;
+  border: 1px solid #46464c;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.disciplineSelectorBtn:hover {
+  background: #404047;
+  border-color: #606068;
+}
+
+.topbarSearch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #37373d;
+  border: 1px solid #46464c;
+  border-radius: 20px;
+  padding: 6px 14px;
+  width: 180px;
+}
+
+.topbarSearch input {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 12.5px;
+  outline: none;
+  width: 100%;
+}
+
+.topbarSearch input::placeholder {
+  color: #88888e;
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 360px;
+  background: #2c2c2f;
+  border: 1px solid #46464c;
+  border-radius: 10px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
+  padding: 6px;
+  z-index: 100;
+}
+
+.dropdownTitle {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #88888e;
+  padding: 8px 12px 6px;
+  letter-spacing: 0.05em;
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #e1e1e4;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.dropdownItem:hover {
+  background: #37373d;
+}
+
+.dropdownItem.active {
+  background: #3a3e4c;
+  border-left: 3px solid #7eb5ff;
+}
+
+.dropdownItemTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 2px;
+}
+
+.dropdownItemMeta {
+  font-size: 11.5px;
+  color: #9a9a9f;
+}
+
+.topbarRight {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.iconBtn {
+  background: transparent;
+  border: none;
+  color: #9a9a9f;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.iconBtn:hover {
+  color: #ffffff;
+  background: #37373d;
+}
+
+.miniCoursesBtn {
+  background: #e85f05;
+  color: #ffffff;
+  border: none;
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.miniCoursesBtn:hover {
+  background: #d45200;
+}
+
+.userAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #111111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.darkModeBadge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #1e1e22;
+  border-radius: 20px;
+  padding: 3px 6px 3px 8px;
+  cursor: pointer;
+  border: 1px solid #37373d;
+}
+
+.newPill {
+  background: #facc15;
+  color: #111111;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+/* ================= LAYOUT ================= */
+.disciplineLayout {
+  display: flex;
+  flex: 1;
+  height: calc(100vh - 56px);
+  max-height: calc(100vh - 56px);
+  overflow: hidden;
+  position: relative;
+  background: #27272c;
+}
+
+/* ================= SIDEBAR ================= */
+.sidebar {
+  width: 320px;
+  background: #37373d;
+  border-right: 1px solid #46464c;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  height: 100%;
+  max-height: 100%;
+  position: relative;
+  user-select: none;
+  z-index: 10;
+}
+
+.sidebarModulesList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 10px;
+}
+
+.sidebarModulesList::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebarModulesList::-webkit-scrollbar-thumb {
+  background: #4c4c52;
+  border-radius: 3px;
+}
+
+.moduleBlock {
+  margin-bottom: 6px;
+}
+
+.moduleHeaderBtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 9px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #e1e1e4;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.moduleHeaderBtn:hover {
+  background: #404047;
+}
+
+.moduleHeaderBtn.expanded {
+  color: #7eb5ff;
+}
+
+.moduleHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.moduleCheckmark {
+  color: #1da551;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.moduleTitleText {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* Sub-items container */
+.moduleSubList {
+  padding: 4px 0 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.subGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #9a9a9f;
+  font-weight: 600;
+  padding: 6px 8px 4px;
+}
+
+.subGroupHeader span:last-child {
+  flex: 1;
+  height: 1px;
+  background: #46464c;
+}
+
+.topicRowBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: #d1d1d6;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  width: 100%;
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+
+.topicRowBtn:hover {
+  background: #404047;
+  color: #ffffff;
+}
+
+.topicRowBtn.active {
+  background: #46464c;
+  color: #7eb5ff;
+  font-weight: 600;
+}
+
+.quizTopicRow {
+  background: rgba(245, 158, 11, 0.08) !important;
+  border: 1px dashed rgba(245, 158, 11, 0.35) !important;
+  margin-top: 6px;
+  margin-bottom: 4px;
+}
+
+.quizTopicRow:hover {
+  background: rgba(245, 158, 11, 0.16) !important;
+  border-color: rgba(245, 158, 11, 0.6) !important;
+}
+
+.quizTopicRow.active {
+  background: rgba(245, 158, 11, 0.22) !important;
+  border-color: #f59e0b !important;
+  color: #fef08a !important;
+}
+
+.quizBadge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.25);
+  color: #facc15;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.topicCheckmark {
+  color: #1da551;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.topicCircleUnchecked {
+  color: #66666c;
+  flex-shrink: 0;
+}
+
+.materialsItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: #9a9a9f;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  transition: all 0.15s;
+}
+
+.materialsItem:hover {
+  color: #ffffff;
+  background: #404047;
+}
+
+.sidebarFooter {
+  padding: 12px 16px;
+  border-top: 1px solid #46464c;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.collapseMenuBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  color: #9a9a9f;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.collapseMenuBtn:hover {
+  color: #ffffff;
+}
+
+/* ================= READING PANE ================= */
+.readingPane {
+  flex: 1;
+  height: 100%;
+  max-height: 100%;
+  padding: 44px 56px 80px;
+  overflow-y: auto;
+  background: #27272c;
+  box-sizing: border-box;
+}
+
+.readingContentWrap {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.readingTitle {
+  font-size: 27px;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.35;
+  margin-bottom: 28px;
+  letter-spacing: -0.015em;
+}
+
+.readingBody {
+  font-size: 15.5px;
+  line-height: 1.78;
+  color: #e1e1e4;
+}
+
+.readingBody p {
+  margin-bottom: 22px;
+}
+
+/* Inline code tags matching screenshot `3.14`, `0.001` */
+.readingBody code {
+  background: #37373d;
+  color: #ffffff;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 13.5px;
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 500;
+}
+
+/* Fenced code blocks */
+.readingBody pre {
+  background: #1e1e23 !important;
+  border: 1px solid #37373d;
+  border-radius: 8px;
+  padding: 18px;
+  margin: 22px 0;
+  overflow-x: auto;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+/* Callout Box matching Screenshot 4: Background #2b323a, Left light blue ! */
+.calloutBox {
+  background: #2b323a;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin: 26px 0;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.calloutBadge {
+  color: #60a5fa;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.2;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.calloutBody {
+  flex: 1;
+  font-size: 14.5px;
+  color: #d1d8e0;
+  line-height: 1.68;
+}
+
+.calloutBody strong {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* Formula Box at the bottom of lecture */
+.formulaCard {
+  background: #fbfbf9;
+  color: #111111;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin: 28px 0;
+  font-size: 14.5px;
+  line-height: 1.65;
+}
+
+.formulaCardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 12px;
+}
+
+.readingFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 50px;
+  padding-top: 26px;
+  border-top: 1px solid #37373d;
+}
+
+.navTopicBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #37373d;
+  color: #e1e1e4;
+  border: 1px solid #46464c;
+  border-radius: 6px;
+  padding: 9px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.navTopicBtn:hover:not(:disabled) {
+  background: #46464c;
+  color: #ffffff;
+}
+
+.navTopicBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.completeBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #1da551;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.completeBtn:hover {
+  background: #178e44;
+}
+
+.completeBtn.completed {
+  background: #37373d;
+  color: #1da551;
+  border: 1px solid #1da551;
+}
+
+/* ================= EMPTY STATE VIEW ================= */
+.emptyDisciplineContainer {
+  flex: 1;
+  height: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 48px 32px;
+  box-sizing: border-box;
+}
+
+.emptyDisciplineWrap {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.emptyCard {
+  background: #37373d;
+  border: 1px solid #46464c;
+  border-radius: 12px;
+  padding: 44px 36px;
+  text-align: center;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  margin-bottom: 32px;
+}
+
+.emptyIconCircle {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: rgba(232, 95, 5, 0.12);
+  color: #e85f05;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  font-size: 30px;
+  border: 1px solid rgba(232, 95, 5, 0.3);
+}
+
+.emptyTitle {
+  font-size: 25px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 12px;
+}
+
+.emptySubtitle {
+  font-size: 15px;
+  color: #b5b5ba;
+  max-width: 600px;
+  margin: 0 auto 24px;
+  line-height: 1.65;
+}
+
+.emptyStatsPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #27272c;
+  border: 1px solid #46464c;
+  border-radius: 20px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #7eb5ff;
+  margin-bottom: 26px;
+}
+
+.emptyActionsRow {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+.switchMathBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #e85f05;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.switchMathBtn:hover {
+  background: #d45200;
+}
+
+/* Syllabus Preview in Empty State */
+.syllabusTitle {
+  font-size: 17px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 16px;
+}
+
+.syllabusList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.syllabusModuleCard {
+  background: #37373d;
+  border: 1px solid #46464c;
+  border-radius: 8px;
+  padding: 14px 18px;
+}
+
+.syllabusModuleTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+
+.syllabusTopicsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.syllabusTopicBadge {
+  font-size: 12px;
+  color: #b5b5ba;
+  background: #2c2c2f;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #46464c;
+}

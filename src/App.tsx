@@ -33,6 +33,8 @@ import {
   GitBranch,
   Minus,
   Map,
+  Calculator,
+  GraduationCap,
 } from 'lucide-react'
 
 
@@ -87,6 +89,11 @@ import {
   createRoadmap,
   updateRoadmap,
   deleteRoadmap,
+  fetchFormulas,
+  createFormula,
+  updateFormula,
+  deleteFormula,
+  toggleFormulaFavorite,
 } from './api'
 import StudyPanel from './components/StudyPanel/StudyPanel'
 import Auth from './Auth'
@@ -97,6 +104,7 @@ import DashboardPanel from './components/DashboardPanel/DashboardPanel'
 import CalendarPanel from './components/CalendarPanel/CalendarPanel'
 import TasksPanel from './components/TasksPanel/TasksPanel'
 import VaultPanel from './components/VaultPanel/VaultPanel'
+import FormulasPanel from './components/FormulasPanel/FormulasPanel'
 import ProjectsPanel from './components/ProjectsPanel/ProjectsPanel'
 import MindMapsPanel, { MindMapModal } from './components/MindMapsPanel/MindMapsPanel'
 import RoadmapsPanel, { RoadmapDrawer } from './components/RoadmapsPanel/RoadmapsPanel'
@@ -104,6 +112,7 @@ import FinancePanel from './components/FinancePanel/FinancePanel'
 import DiaryPanel from './components/DiaryPanel/DiaryPanel'
 import HabitsPanel from './components/HabitsPanel/HabitsPanel'
 import FilesPanel from './components/FilesPanel/FilesPanel'
+import LMSPortal from './components/LMS/LMSPortal'
 
 import TaskDrawer from './components/drawers/TaskDrawer'
 import GoalDrawer from './components/drawers/GoalDrawer'
@@ -163,9 +172,11 @@ import type {
   RoadmapPayload,
   TaskFilters,
   SnippetFilters,
+  Formula,
+  FormulaPayload,
 } from './types'
 
-type Section = 'dashboard' | 'calendar' | 'tasks' | 'vault' | 'finance' | 'diary' | 'files' | 'projects' | 'habits' | 'mindmaps' | 'roadmaps' | 'study'
+type Section = 'dashboard' | 'calendar' | 'tasks' | 'vault' | 'formulas' | 'finance' | 'diary' | 'files' | 'projects' | 'habits' | 'mindmaps' | 'roadmaps' | 'study' | 'lms'
 type SnippetSelection = number | 'new' | null
 
 
@@ -187,9 +198,11 @@ const navigation: Array<{ id: Section; label: string; icon: any }> = [
   { id: 'calendar', label: 'Календар', icon: CalendarDays },
   { id: 'tasks', label: 'Задачі', icon: ListChecks },
   { id: 'vault', label: 'Сховище коду', icon: Code2 },
+  { id: 'formulas', label: 'Сховище формул', icon: Calculator },
   { id: 'mindmaps', label: 'Інтелект-карти', icon: GitBranch },
   { id: 'projects', label: 'Проєкти', icon: Briefcase },
   { id: 'roadmaps', label: 'Роадмапи', icon: Map },
+  { id: 'lms', label: 'LMS Навчання', icon: GraduationCap },
   { id: 'habits', label: 'Звички', icon: Target },
   { id: 'finance', label: 'Фінанси', icon: Wallet },
   { id: 'diary', label: 'Щоденник', icon: BookOpen },
@@ -239,6 +252,7 @@ function App() {
   const [roadmapDrawerOpen, setRoadmapDrawerOpen] = useState(false)
   const [editingRoadmap, setEditingRoadmap] = useState<Roadmap | null>(null)
   const [quickSnippetProjectId, setQuickSnippetProjectId] = useState<number | null>(null)
+  const [formulas, setFormulas] = useState<Formula[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedDate, setSelectedDate] = useState(todayKey())
@@ -282,7 +296,7 @@ function App() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [taskData, snippetData, balanceData, goalsData, diaryData, subData, projectData, habitData, mindMapData, roadmapData] = await Promise.all([
+      const [taskData, snippetData, balanceData, goalsData, diaryData, subData, projectData, habitData, mindMapData, roadmapData, formulasData] = await Promise.all([
         fetchTasks(),
         fetchSnippets(),
         fetchBalance(),
@@ -293,6 +307,7 @@ function App() {
         fetchHabits(),
         fetchMindMaps(),
         fetchRoadmaps(),
+        fetchFormulas(),
       ])
       setTasks(taskData)
       setSnippets(snippetData)
@@ -304,6 +319,7 @@ function App() {
       setHabits(habitData)
       setMindMaps(mindMapData)
       setRoadmaps(roadmapData)
+      setFormulas(formulasData)
       setError('')
     } catch (requestError) {
       setError(errorMessage(requestError))
@@ -397,8 +413,9 @@ function App() {
       ...goals.flatMap((goal) => goal.attachments),
       ...diaryEntries.flatMap((entry) => entry.attachments),
       ...projects.flatMap((proj) => proj.attachments),
+      ...formulas.flatMap((formula) => formula.attachments || []),
     ],
-    [snippets, tasks, goals, diaryEntries, projects],
+    [snippets, tasks, goals, diaryEntries, projects, formulas],
   )
   const selectedSnippet =
     typeof snippetSelection === 'number'
@@ -943,6 +960,48 @@ function App() {
     }
   }
 
+  // Formula Actions
+  const handleSaveFormula = async (payload: FormulaPayload, id?: number) => {
+    try {
+      if (id) {
+        await updateFormula(id, payload)
+      } else {
+        await createFormula(payload)
+      }
+      await loadData()
+    } catch (requestError) {
+      setError(errorMessage(requestError))
+    }
+  }
+
+  const handleDeleteFormula = async (id: number) => {
+    const formula = formulas.find((f) => f.id === id)
+    const title = formula ? formula.title : `формулу #${id}`
+    if (
+      !(await confirm({
+        title: 'Видалення формули',
+        message: `Ви дійсно хочете видалити формулу "${title}"?`,
+      }))
+    ) {
+      return
+    }
+    try {
+      await deleteFormula(id)
+      await loadData()
+    } catch (requestError) {
+      setError(errorMessage(requestError))
+    }
+  }
+
+  const handleToggleFavoriteFormula = async (id: number) => {
+    try {
+      await toggleFormulaFavorite(id)
+      await loadData()
+    } catch (requestError) {
+      setError(errorMessage(requestError))
+    }
+  }
+
   // Habits Actions
   const openNewHabit = () => {
     setEditingHabit(null)
@@ -1057,6 +1116,10 @@ function App() {
     return <StudyPanel onExit={() => setSection('calendar')} />;
   }
 
+  if (section === 'lms') {
+    return <LMSPortal roadmaps={roadmaps} mindMaps={mindMaps} onExit={() => setSection('roadmaps')} />;
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -1098,6 +1161,7 @@ function App() {
           <div className="sidebar-stats-grid">
             <div className="stat-badge"><span>Задач</span><strong>{tasks.length}</strong></div>
             <div className="stat-badge"><span>Код</span><strong>{snippets.length}</strong></div>
+            <div className="stat-badge"><span>Формул</span><strong>{formulas.length}</strong></div>
             <div className="stat-badge"><span>Карт</span><strong>{mindMaps.length}</strong></div>
             <div className="stat-badge"><span>Проєктів</span><strong>{projects.length}</strong></div>
             <div className="stat-badge"><span>Цілей</span><strong>{goals.length}</strong></div>
@@ -1289,6 +1353,16 @@ function App() {
               onDelete={removeSnippet}
               onDeleteAttachment={removeAttachment}
               setIsFullscreenCode={setIsFullscreenCode}
+            />
+          ) : null}
+
+          {section === 'formulas' ? (
+            <FormulasPanel
+              formulas={formulas}
+              onSaveFormula={handleSaveFormula}
+              onDeleteFormula={handleDeleteFormula}
+              onToggleFavorite={handleToggleFavoriteFormula}
+              onRefresh={loadData}
             />
           ) : null}
 
@@ -1549,6 +1623,7 @@ function sectionTitle(section: any) {
     calendar: 'Календар',
     tasks: 'Задачі та плани',
     vault: 'Сховище коду',
+    formulas: 'Сховище формул та обчислень',
     finance: 'Фінансові цілі',
     diary: 'Особистий щоденник',
     files: 'Всі файли',
@@ -1557,6 +1632,7 @@ function sectionTitle(section: any) {
     habits: 'Звички та продуктивність',
     mindmaps: 'Інтелект-карти',
     study: 'NoteHub Study',
+    lms: 'NoteHub LMS Портал',
   }
   return titles[section]
 }

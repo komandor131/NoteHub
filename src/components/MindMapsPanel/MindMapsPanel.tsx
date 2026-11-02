@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   Home,
@@ -64,6 +65,7 @@ export default function MindMapsPanel({
   const [dragNodeStart, setDragNodeStart] = useState({ mouseX: 0, mouseY: 0, nodeX: 0, nodeY: 0 })
 
   const [mapTitle, setMapTitle] = useState('')
+  const [mindMapCategory, setMindMapCategory] = useState<'all' | 'math' | 'university' | 'english'>('all')
 
   // Sub-mapping and nested study states
   const [rootNodes, setRootNodes] = useState<MindMapNode[]>([])
@@ -435,6 +437,23 @@ export default function MindMapsPanel({
     handleUpdateNodeForId(selectedNodeId, fields)
   }
 
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault()
+    const container = e.currentTarget.getBoundingClientRect()
+    const mouseX = e.clientX - container.left
+    const mouseY = e.clientY - container.top
+
+    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87
+    const newScale = Math.min(4.0, Math.max(0.05, Number((scale * zoomFactor).toFixed(3))))
+
+    const newPanX = mouseX - ((mouseX - panX) / scale) * newScale
+    const newPanY = mouseY - ((mouseY - panY) / scale) * newScale
+
+    setScale(newScale)
+    setPanX(newPanX)
+    setPanY(newPanY)
+  }
+
   const handleMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
     if (target.closest('.mindmap-viewport-bg')) {
@@ -658,7 +677,7 @@ export default function MindMapsPanel({
 
     const scaleX = width / treeWidth
     const scaleY = height / treeHeight
-    const newScale = Math.max(0.4, Math.min(1.5, Math.min(scaleX, scaleY)))
+    const newScale = Math.max(0.05, Math.min(1.5, Math.min(scaleX, scaleY)))
 
     const newPanX = (width - treeWidth * newScale) / 2 - minX * newScale
     const newPanY = (height - treeHeight * newScale) / 2 - minY * newScale
@@ -728,7 +747,7 @@ export default function MindMapsPanel({
           <div className="zoom-controls">
             <button
               className="btn secondary"
-              onClick={() => setScale((s) => Math.max(0.1, s - 0.1))}
+              onClick={() => setScale((s) => Math.max(0.05, Number((s - 0.1).toFixed(2))))}
               title="Зменшити масштаб"
             >
               <Minus size={14} />
@@ -787,6 +806,7 @@ export default function MindMapsPanel({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
+            onWheel={handleWheel}
           >
             <div className="mindmap-viewport-bg" />
 
@@ -1167,6 +1187,32 @@ export default function MindMapsPanel({
             {selectedNode ? (
               <>
                 <h3 className="inspector-title">Редагувати вузол</h3>
+                <button
+                  type="button"
+                  className="btn primary"
+                  style={{
+                    marginBottom: '14px',
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    border: 'none',
+                    color: '#fff',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '12.5px'
+                  }}
+                  onClick={() => {
+                    if (setSection) {
+                      setSection('roadmaps')
+                    }
+                  }}
+                >
+                  <BookOpen size={15} /> 📖 Академічний конспект теми
+                </button>
 
                 <div className="inspector-section">
                   <label className="inspector-label">Тип вмісту</label>
@@ -1482,8 +1528,54 @@ export default function MindMapsPanel({
         </button>
       </div>
 
+      <div style={{ display: 'flex', gap: '8px', padding: '0 24px 16px 24px', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className={`btn ${mindMapCategory === 'all' ? 'primary' : 'secondary'}`}
+          style={{ height: '32px', fontSize: '13px', padding: '0 14px' }}
+          onClick={() => setMindMapCategory('all')}
+        >
+          Всі карти ({mindMaps.length})
+        </button>
+        <button
+          type="button"
+          className={`btn ${mindMapCategory === 'university' ? 'primary' : 'secondary'}`}
+          style={{ height: '32px', fontSize: '13px', padding: '0 14px' }}
+          onClick={() => setMindMapCategory('university')}
+        >
+          🏛️ Університетські дисципліни ({mindMaps.filter(m => m.title.startsWith('У')).length})
+        </button>
+        <button
+          type="button"
+          className={`btn ${mindMapCategory === 'english' ? 'primary' : 'secondary'}`}
+          style={{ height: '32px', fontSize: '13px', padding: '0 14px' }}
+          onClick={() => setMindMapCategory('english')}
+        >
+          🇬🇧 Англійська мова (Strong B2) ({mindMaps.filter(m => m.title.includes('Англійськ') || m.title.startsWith('ENG')).length})
+        </button>
+        <button
+          type="button"
+          className={`btn ${mindMapCategory === 'math' ? 'primary' : 'secondary'}`}
+          style={{ height: '32px', fontSize: '13px', padding: '0 14px' }}
+          onClick={() => setMindMapCategory('math')}
+        >
+          🎓 Математика та аналітика ({mindMaps.filter(m => !m.title.startsWith('У') && !m.title.includes('Англійськ') && !m.title.startsWith('ENG')).length})
+        </button>
+      </div>
+
       <div className="mindmaps-grid">
-        {mindMaps.map((map) => {
+        {[...mindMaps].filter(m => {
+          if (mindMapCategory === 'university') return m.title.startsWith('У');
+          if (mindMapCategory === 'english') return m.title.includes('Англійськ') || m.title.startsWith('ENG');
+          if (mindMapCategory === 'math') return !m.title.startsWith('У') && !m.title.includes('Англійськ') && !m.title.startsWith('ENG');
+          return true;
+        }).sort((a, b) => {
+          const matchA = a.title.match(/(?:У|ENG|^)(\d+)/);
+          const numA = matchA ? parseInt(matchA[1], 10) : parseInt(a.title.match(/\d+/)?.[0] || '999', 10);
+          const matchB = b.title.match(/(?:У|ENG|^)(\d+)/);
+          const numB = matchB ? parseInt(matchB[1], 10) : parseInt(b.title.match(/\d+/)?.[0] || '999', 10);
+          return numA - numB;
+        }).map((map) => {
           let nodeCount = 0
           try {
             const parsed = JSON.parse(map.nodes_data)

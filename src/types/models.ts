@@ -16,6 +16,7 @@ export type Section =
   | 'calendar'
   | 'tasks'
   | 'vault'
+  | 'formulas'
   | 'finance'
   | 'diary'
   | 'files'
@@ -25,7 +26,7 @@ export type Section =
   | 'roadmaps'
   | 'study'
 
-export type EntityType = 'task' | 'snippet' | 'goal' | 'diary' | 'project' | 'mindmap' | 'roadmap'
+export type EntityType = 'task' | 'snippet' | 'goal' | 'diary' | 'project' | 'mindmap' | 'roadmap' | 'formula'
 
 export interface Attachment {
   id: number
@@ -190,6 +191,7 @@ export interface Roadmap {
   title: string
   description: string
   canvas_data: string
+  category?: 'learning' | 'university' | 'english'
   createdAt: string
   updatedAt: string
 }
@@ -198,6 +200,7 @@ export interface RoadmapPayload {
   title: string
   description: string
   canvas_data?: string
+  category?: 'learning' | 'university' | 'english'
 }
 
 export interface Habit {
@@ -330,4 +333,49 @@ export interface StudyCourse {
   orderIndex: number
 }
 
+export interface FormulaVariable {
+  name: string
+  label?: string
+  defaultValue: number | string
+  type?: 'number' | 'vector' | 'matrix'
+  min?: number
+  max?: number
+  step?: number
+  unit?: string
+  description?: string
+}
 
+export interface Formula {
+  id: number
+  title: string
+  category: string
+  latex: string
+  expression: string
+  variables: FormulaVariable[]
+  description: string
+  example?: string
+  tags: string[]
+  isFavorite: boolean
+  attachments: Attachment[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface FormulaPayload {
+  title: string
+  category: string
+  latex: string
+  expression: string
+  variables: FormulaVariable[]
+  description: string
+  example?: string
+  tags: string[]
+  isFavorite?: boolean
+}
+
+export interface FormulaFilters {
+  search: string
+  category: string
+  tag: string
+  onlyFavorites: boolean
+}

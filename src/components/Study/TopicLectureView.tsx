@@ -18,6 +18,8 @@ import confetti from 'canvas-confetti'
 import MathContent from '../MathContent/MathContent'
 import { MATH_SECTION_1_TESTS, type MathTestQuestion } from '../../data/mathSection1Tests'
 import { MATH_SECTION_2_TESTS } from '../../data/mathSection2Tests'
+import { getUniversityQuestions } from '../../data/universityTests'
+import { getEnglishQuestions } from '../../data/englishTests'
 import styles from './TopicLectureView.module.css'
 
 export interface RoadmapNodeItem {
@@ -59,16 +61,21 @@ export default function TopicLectureView({
   const [selectedFilter, setSelectedFilter] = useState<string>('all')
   const [userAnswers, setUserAnswers] = useState<Record<string, number>>({})
 
-  // Filter only math topics up to 1.2 for sequential navigation
+  // Filter for sequential navigation: Math topics if in Math roadmap, otherwise all section/subtopic nodes
   const eligibleNodes = useMemo(() => {
-    return allNodes.filter(
-      (n) =>
-        n.id === 'math_1' ||
-        n.id.startsWith('math_1_') ||
-        n.id === 'math_2' ||
-        n.id.startsWith('math_2_')
-    )
-  }, [allNodes])
+    const isMath = roadmapTitle.toLowerCase().includes('математика')
+    if (isMath) {
+      const mathList = allNodes.filter(
+        (n) =>
+          n.id === 'math_1' ||
+          n.id.startsWith('math_1_') ||
+          n.id === 'math_2' ||
+          n.id.startsWith('math_2_')
+      )
+      if (mathList.length > 0) return mathList
+    }
+    return allNodes.filter((n) => n.id !== 'root')
+  }, [allNodes, roadmapTitle])
 
   const { currentIndex, prevNode, nextNode, totalCount } = useMemo(() => {
     const list = eligibleNodes.length > 0 ? eligibleNodes : allNodes.filter((n) => n.id !== 'root')
@@ -89,8 +96,9 @@ export default function TopicLectureView({
 
     const token = localStorage.getItem('token')
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+    const query = `?title=${encodeURIComponent(nodeTitle)}`
 
-    fetch(`/api/roadmaps/notes/${encodeURIComponent(nodeId)}`, { headers })
+    fetch(`/api/roadmaps/notes/${encodeURIComponent(nodeId)}${query}`, { headers })
       .then((res) => res.json())
       .then((data) => {
         if (!isMounted) return
@@ -106,7 +114,7 @@ export default function TopicLectureView({
     return () => {
       isMounted = false
     }
-  }, [nodeId])
+  }, [nodeId, nodeTitle])
 
   // Extract executive summary from markdown if present
   const executiveSummary = useMemo(() => {
@@ -118,27 +126,43 @@ export default function TopicLectureView({
     return introLine || 'Опануйте базові визначення, ключові формули та розрахунки на реальних числових прикладах.'
   }, [notes])
 
-  // Check active section (Section 1.1 vs Section 1.2)
-  const isSection2 = nodeId === 'math_2' || nodeId.startsWith('math_2_')
-  const activeSectionTests = useMemo(() => {
-    return isSection2 ? MATH_SECTION_2_TESTS : MATH_SECTION_1_TESTS
-  }, [isSection2])
-  const activeSectionTitle = isSection2 ? 'Розділ 1.2 Теорія ймовірностей' : 'Розділ 1.1 Описова статистика'
+  // Check active section (Section 1.1 vs Section 1.2 vs University Disciplines)
+  const isMathSection1 = nodeId === 'math_1' || nodeId.startsWith('math_1_')
+  const isMathSection2 = nodeId === 'math_2' || nodeId.startsWith('math_2_')
 
-  // Reset filter when switching between sections
+  const isEnglishTopic = nodeId.toLowerCase().startsWith('eng') || /англ|english/i.test(roadmapTitle)
+
+  const activeSectionTests = useMemo(() => {
+    if (isMathSection1) return MATH_SECTION_1_TESTS
+    if (isMathSection2) return MATH_SECTION_2_TESTS
+    if (isEnglishTopic) return getEnglishQuestions(nodeId, nodeTitle, roadmapTitle)
+    return getUniversityQuestions(nodeId, nodeTitle, roadmapTitle)
+  }, [isMathSection1, isMathSection2, isEnglishTopic, nodeId, nodeTitle, roadmapTitle])
+
+  const activeSectionTitle = useMemo(() => {
+    if (isMathSection1) return 'Розділ 1.1 Описова статистика'
+    if (isMathSection2) return 'Розділ 1.2 Теорія ймовірностей'
+    if (isEnglishTopic) return '🇬🇧 Англійська мова: Від нуля до Strong B2'
+    return roadmapTitle
+  }, [isMathSection1, isMathSection2, isEnglishTopic, roadmapTitle])
+
+  // Reset filter when switching between topics
   useEffect(() => {
     setSelectedFilter('all')
-  }, [isSection2])
+  }, [nodeId])
 
   // Current topic quick check tests (3-4 questions for this nodeId)
   const currentTopicTests = useMemo(() => {
-    return activeSectionTests.filter((t) => t.topicId === nodeId)
+    const directMatches = activeSectionTests.filter((t) => t.topicId === nodeId)
+    if (directMatches.length > 0) return directMatches.slice(0, 4)
+    return activeSectionTests.slice(0, 4)
   }, [nodeId, activeSectionTests])
 
   // Filtered tests for dedicated Trainer tab
   const displayedTrainerTests = useMemo(() => {
     if (selectedFilter === 'all') return activeSectionTests
-    return activeSectionTests.filter((t) => t.topicId === selectedFilter)
+    const filtered = activeSectionTests.filter((t) => t.topicId === selectedFilter)
+    return filtered.length > 0 ? filtered : activeSectionTests
   }, [selectedFilter, activeSectionTests])
 
   // Dynamic topic pills for the trainer tab
@@ -146,10 +170,11 @@ export default function TopicLectureView({
     const map = new Map<string, { title: string; count: number }>()
     activeSectionTests.forEach((q) => {
       const existing = map.get(q.topicId)
+      const qTitle = (q as any).topicTitle || nodeTitle || 'Основна тема'
       if (existing) {
         existing.count++
       } else {
-        map.set(q.topicId, { title: q.topicTitle, count: 1 })
+        map.set(q.topicId, { title: qTitle, count: 1 })
       }
     })
     return Array.from(map.entries()).map(([id, info]) => ({
@@ -157,7 +182,7 @@ export default function TopicLectureView({
       title: info.title,
       count: info.count
     }))
-  }, [activeSectionTests])
+  }, [activeSectionTests, nodeTitle])
 
   // Global test statistics for active section
   const { answeredCount, correctCount, accuracyPercent } = useMemo(() => {

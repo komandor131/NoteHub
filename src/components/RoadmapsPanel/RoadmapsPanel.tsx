@@ -12,6 +12,8 @@ import {
   BookOpen,
   X,
   GitBranch,
+  GraduationCap,
+  Sparkles,
 } from 'lucide-react'
 import type { Roadmap, RoadmapPayload, RoadmapsPanelProps } from '../../types'
 import { fetchMindMaps } from '../../api'
@@ -55,6 +57,41 @@ export default function RoadmapsPanel({
 
   // Full-page LMS lecture route state (up to theme 1.2 in math)
   const [activeLectureNodeId, setActiveLectureNodeId] = useState<string | null>(null)
+
+  const [activeCategory, setActiveCategory] = useState<'learning' | 'university' | 'english'>('learning')
+
+  const englishRoadmaps = useMemo(() => {
+    return roadmaps.filter((r) => r.category === 'english' || r.title.includes('Англійськ') || r.title.startsWith('ENG'))
+  }, [roadmaps])
+
+  const learningRoadmaps = useMemo(() => {
+    return roadmaps.filter(
+      (r) =>
+        r.category !== 'university' &&
+        r.category !== 'english' &&
+        !r.title.startsWith('У') &&
+        !r.title.includes('Англійськ') &&
+        !r.title.startsWith('ENG')
+    )
+  }, [roadmaps])
+
+  const universityRoadmaps = useMemo(() => {
+    return roadmaps.filter((r) => r.category === 'university' || r.title.startsWith('У'))
+  }, [roadmaps])
+
+  const displayedRoadmaps = useMemo(() => {
+    let list = learningRoadmaps
+    if (activeCategory === 'university') list = universityRoadmaps
+    else if (activeCategory === 'english') list = englishRoadmaps
+
+    return [...list].sort((a, b) => {
+      const matchA = a.title.match(/(?:У|ENG|^)(\d+)/)
+      const numA = matchA ? parseInt(matchA[1], 10) : parseInt(a.title.match(/\d+/)?.[0] || '999', 10)
+      const matchB = b.title.match(/(?:У|ENG|^)(\d+)/)
+      const numB = matchB ? parseInt(matchB[1], 10) : parseInt(b.title.match(/\d+/)?.[0] || '999', 10)
+      return numA - numB
+    })
+  }, [activeCategory, learningRoadmaps, universityRoadmaps, englishRoadmaps])
 
   // Synchronize hash routing: #/roadmap/:roadmapId/lecture/:nodeId
   useEffect(() => {
@@ -284,6 +321,76 @@ export default function RoadmapsPanel({
     }
   }
 
+  const handleCanvasWheel = (e: React.WheelEvent) => {
+    e.preventDefault()
+    const container = e.currentTarget.getBoundingClientRect()
+    const mouseX = e.clientX - container.left
+    const mouseY = e.clientY - container.top
+
+    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87
+    const newScale = Math.min(3.0, Math.max(0.05, Number((canvasScale * zoomFactor).toFixed(3))))
+
+    const newPanX = mouseX - ((mouseX - canvasPanX) / canvasScale) * newScale
+    const newPanY = mouseY - ((mouseY - canvasPanY) / canvasScale) * newScale
+
+    setCanvasScale(newScale)
+    setCanvasPanX(newPanX)
+    setCanvasPanY(newPanY)
+  }
+
+  const handleFitView = () => {
+    if (nodes.length === 0) return
+    const containerEl = document.querySelector('.canvas-container')
+    const width = containerEl ? containerEl.clientWidth : 900
+    const height = containerEl ? containerEl.clientHeight : 700
+
+    let minX = Infinity
+    let maxX = -Infinity
+    let minY = Infinity
+    let maxY = -Infinity
+
+    nodes.forEach((n) => {
+      const x = n.x ?? 0
+      const y = n.y ?? 0
+      if (x < minX) minX = x
+      if (x + nodeWidth > maxX) maxX = x + nodeWidth
+      if (y < minY) minY = y
+      if (y + nodeHeight > maxY) maxY = y + nodeHeight
+    })
+
+    const padding = 80
+    const treeWidth = Math.max(maxX - minX + padding * 2, 400)
+    const treeHeight = Math.max(maxY - minY + padding * 2, 400)
+
+    const scaleX = width / treeWidth
+    const scaleY = height / treeHeight
+    const targetScale = Math.max(0.05, Math.min(1.2, Math.min(scaleX, scaleY)))
+
+    const centerX = minX + (maxX - minX) / 2
+    const targetPanX = width / 2 - centerX * targetScale
+    const targetPanY = 40 - minY * targetScale
+
+    setCanvasScale(Number(targetScale.toFixed(2)))
+    setCanvasPanX(targetPanX)
+    setCanvasPanY(targetPanY)
+  }
+
+  const handleFocusNode = (nodeId: string) => {
+    const node = nodes.find((n) => n.id === nodeId)
+    if (!node) return
+    const containerEl = document.querySelector('.canvas-container')
+    const width = containerEl ? containerEl.clientWidth : 900
+    const height = containerEl ? containerEl.clientHeight : 700
+
+    const targetScale = 1.0
+    const targetPanX = width / 2 - (node.x + nodeWidth / 2) * targetScale
+    const targetPanY = height / 2 - (node.y + nodeHeight / 2) * targetScale
+
+    setCanvasScale(targetScale)
+    setCanvasPanX(targetPanX)
+    setCanvasPanY(targetPanY)
+  }
+
   const handleNodeClick = (nodeId: string) => {
     if (isConnecting && connectingFromId) {
       if (connectingFromId !== nodeId) {
@@ -386,21 +493,80 @@ export default function RoadmapsPanel({
           <div className="panel-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
             <div>
               <p className="kicker">Карти розвитку</p>
-              <h2>Навчальні роадмапи ({roadmaps.length})</h2>
+              <h2>
+                {activeCategory === 'university'
+                  ? '🏛️ Університетські дисципліни'
+                  : activeCategory === 'english'
+                  ? '🇬🇧 Англійська мова (Strong B2)'
+                  : '🎓 Навчальні роадмапи'} ({displayedRoadmaps.length})
+              </h2>
             </div>
-            <button className="btn primary" type="button" onClick={onCreateRoadmap}>
-              <Plus size={16} />
-              Новий роадмап
-            </button>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              {setSection && (
+                <button
+                  className="btn secondary"
+                  type="button"
+                  onClick={() => setSection('lms')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: 'rgba(56, 189, 248, 0.12)',
+                    borderColor: 'rgba(56, 189, 248, 0.4)',
+                    color: '#38bdf8',
+                    fontWeight: 600,
+                  }}
+                >
+                  <GraduationCap size={16} />
+                  Відкрити LMS Портал
+                </button>
+              )}
+              <button className="btn primary" type="button" onClick={onCreateRoadmap}>
+                <Plus size={16} />
+                Новий роадмап
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.categoryTabsContainer}>
+            <div className={styles.categoryTabs}>
+              <button
+                type="button"
+                className={`${styles.categoryTab} ${activeCategory === 'learning' ? styles.activeTab : ''}`}
+                onClick={() => setActiveCategory('learning')}
+              >
+                <span>🎓 Професійні роадмапи</span>
+                <span className={styles.tabBadge}>{learningRoadmaps.length}</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.categoryTab} ${activeCategory === 'university' ? styles.activeTab : ''}`}
+                onClick={() => setActiveCategory('university')}
+              >
+                <span>🏛️ Університетські дисципліни</span>
+                <span className={styles.tabBadge}>{universityRoadmaps.length}</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.categoryTab} ${activeCategory === 'english' ? styles.activeTab : ''}`}
+                onClick={() => setActiveCategory('english')}
+              >
+                <span>🇬🇧 Англійська мова (Strong B2)</span>
+                <span className={styles.tabBadge}>{englishRoadmaps.length}</span>
+              </button>
+            </div>
+            <div className={styles.categoryNotice}>
+              {activeCategory === 'university'
+                ? '⭐ Спеціальні університетські курси згідно з навчальним планом: Комп\'ютерні системи, Прикладна кібербезпека, Алгоритми, Python FullStack, Go, Rust, CI/CD, AWS Lambda, QA тощо.'
+                : activeCategory === 'english'
+                ? '⭐ Комплексна система вивчення англійської від абсолютного нуля до Strong B2: фонетика, 4000+ слів, чітка граматика без зубріння, розмовна практика та професійна IT/Business комунікація для розробників.'
+                : '⭐ Професійні інженерні треки та фундаментальні дисципліни розробника (FullStack, Backend, Frontend, DevOps, Математика AI тощо).'}
+            </div>
           </div>
         </div>
 
         <div className="projects-grid">
-          {[...roadmaps].sort((a, b) => {
-            const numA = parseInt(a.title.match(/^\d+/)?.[0] || '999', 10)
-            const numB = parseInt(b.title.match(/^\d+/)?.[0] || '999', 10)
-            return numA - numB
-          }).map((rm) => {
+          {displayedRoadmaps.map((rm) => {
             let totalSteps = 0
             let completedSteps = 0
             try {
@@ -554,6 +720,7 @@ export default function RoadmapsPanel({
           onMouseMove={handleCanvasMouseMove}
           onMouseUp={handleCanvasMouseUp}
           onMouseLeave={handleCanvasMouseUp}
+          onWheel={handleCanvasWheel}
           style={isFullscreen ? { height: '100%', minHeight: 'auto' } : undefined}
         >
           <div className="canvas-toolbar">
@@ -580,31 +747,79 @@ export default function RoadmapsPanel({
             >
               <GitBranch size={14} style={{ marginRight: '4px' }} /> З'єднати крок
             </button>
-            <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 className="btn secondary"
-                style={{ width: '30px', height: '30px', minWidth: 0, padding: 0 }}
-                onClick={() => setCanvasScale((s) => Math.max(0.4, s - 0.1))}
+                style={{ height: '30px', padding: '0 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                onClick={handleFitView}
+                title="Вмістити всю карту на екрані"
               >
-                -
+                <Maximize2 size={13} /> Вмістити все
               </button>
-              <button
-                type="button"
-                className="btn secondary"
-                style={{ width: '30px', height: '30px', minWidth: 0, padding: 0 }}
-                onClick={() => setCanvasScale(1)}
-              >
-                100%
-              </button>
-              <button
-                type="button"
-                className="btn secondary"
-                style={{ width: '30px', height: '30px', minWidth: 0, padding: 0 }}
-                onClick={() => setCanvasScale((s) => Math.min(2, s + 0.1))}
-              >
-                +
-              </button>
+
+              {selectedNodeId && (
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ height: '30px', padding: '0 8px', fontSize: '11px', borderColor: 'var(--pink)', color: 'var(--pink)' }}
+                  onClick={() => handleFocusNode(selectedNodeId)}
+                  title="Сфокусувати на виділеному кроці"
+                >
+                  🎯 До кроку
+                </button>
+              )}
+
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: 'rgba(24, 24, 27, 0.8)', padding: '2px 4px', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ width: '26px', height: '26px', minWidth: 0, padding: 0 }}
+                  onClick={() => setCanvasScale((s) => Math.max(0.05, Number((s - 0.1).toFixed(2))))}
+                  title="Віддалити"
+                >
+                  -
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ minWidth: '48px', height: '26px', padding: '0 6px', fontSize: '11px', fontWeight: 700 }}
+                  onClick={() => setCanvasScale(1)}
+                  title="Скинути на 100%"
+                >
+                  {Math.round(canvasScale * 100)}%
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ width: '26px', height: '26px', minWidth: 0, padding: 0 }}
+                  onClick={() => setCanvasScale((s) => Math.min(3.0, Number((s + 0.1).toFixed(2))))}
+                  title="Наблизити"
+                >
+                  +
+                </button>
+              </div>
+
+              <div style={{ display: 'inline-flex', gap: '3px' }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ height: '26px', padding: '0 6px', fontSize: '10.5px' }}
+                  onClick={() => setCanvasScale(0.15)}
+                  title="Масштаб 15% (Огляд усієї роадмапи)"
+                >
+                  15%
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ height: '26px', padding: '0 6px', fontSize: '10.5px' }}
+                  onClick={() => setCanvasScale(0.5)}
+                  title="Масштаб 50%"
+                >
+                  50%
+                </button>
+              </div>
             </div>
           </div>
 
@@ -743,6 +958,10 @@ export default function RoadmapsPanel({
                     e.stopPropagation()
                     handleNodeClick(node.id)
                   }}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation()
+                    handleOpenFullLecture(node.id)
+                  }}
                   onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
                 >
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', width: '100%', overflow: 'hidden' }}>
@@ -810,13 +1029,39 @@ export default function RoadmapsPanel({
                         onMouseDown={(e) => e.stopPropagation()}
                       >
                         <ExternalLink size={10} />
-                        <span style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {node.linkLabel || 'Ресурс'}
                         </span>
                       </a>
                     ) : (
                       <span />
                     )}
+
+                    <button
+                      type="button"
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: '#34d399',
+                        background: 'rgba(16, 185, 129, 0.15)',
+                        border: '1px solid rgba(16, 185, 129, 0.35)',
+                        borderRadius: '6px',
+                        padding: '3px 8px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpenFullLecture(node.id)
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      title="Відкрити академічний конспект теми та тренажер тестів"
+                    >
+                      <BookOpen size={11} /> 📖 Тема
+                    </button>
                   </div>
                 </div>
               )
@@ -893,20 +1138,14 @@ export default function RoadmapsPanel({
                       />
                     </div>
                     {selectedNodeId && (() => {
-                      const isMathRoadmap = roadmap && (roadmap.id === 230 || roadmap.title.toLowerCase().includes('математика'))
-                      const isMathUpTo1_2 = isMathRoadmap && (
-                        node.id === 'math_1' || node.id.startsWith('math_1_') ||
-                        node.id === 'math_2' || node.id.startsWith('math_2_')
-                      )
-                      if (!isMathUpTo1_2) return null
                       return (
-                        <div style={{ marginTop: '10px' }}>
+                        <div style={{ marginTop: '14px' }}>
                           <button
                             type="button"
                             className="btn primary"
                             style={{
-                              minHeight: '40px',
-                              fontSize: '13px',
+                              minHeight: '42px',
+                              fontSize: '13.5px',
                               fontWeight: 800,
                               display: 'flex',
                               alignItems: 'center',
@@ -915,14 +1154,14 @@ export default function RoadmapsPanel({
                               background: 'linear-gradient(135deg, #10b981, #059669)',
                               border: 'none',
                               color: '#fff',
-                              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
+                              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
                               cursor: 'pointer',
                               width: '100%',
                               borderRadius: '8px'
                             }}
                             onClick={() => handleOpenFullLecture(node.id)}
                           >
-                            <BookOpen size={16} /> 📖 Відкрити конспект
+                            <BookOpen size={16} /> 📖 Відкрити конспект і тести
                           </button>
                         </div>
                       )
@@ -970,14 +1209,17 @@ export function RoadmapDrawer({
 }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [category, setCategory] = useState<'learning' | 'university' | 'english'>('learning')
 
   useEffect(() => {
     if (roadmap) {
       setTitle(roadmap.title)
       setDescription(roadmap.description)
+      setCategory(roadmap.category === 'university' ? 'university' : roadmap.category === 'english' ? 'english' : 'learning')
     } else {
       setTitle('')
       setDescription('')
+      setCategory('learning')
     }
   }, [roadmap, open])
 
@@ -992,6 +1234,7 @@ export function RoadmapDrawer({
     void onSubmit({
       title: title.trim(),
       description: description.trim(),
+      category,
     })
   }
 
@@ -1008,6 +1251,27 @@ export function RoadmapDrawer({
         </div>
 
         <div className="drawer-body" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="form-group">
+            <label className="form-label">Тип роадмапу</label>
+            <select
+              className="form-control"
+              value={category}
+              onChange={(e) => setCategory(e.target.value as 'learning' | 'university' | 'english')}
+              style={{
+                background: '#09090b',
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
+                color: 'var(--text)',
+                padding: '8px 12px',
+                fontSize: '14px',
+              }}
+            >
+              <option value="learning">🎓 Професійні роадмапи (Learning)</option>
+              <option value="university">🏛️ Університетські дисципліни (University)</option>
+              <option value="english">🇬🇧 Англійська мова (Strong B2)</option>
+            </select>
+          </div>
+
           <div className="form-group">
             <label className="form-label">Назва роадмапу</label>
             <input
