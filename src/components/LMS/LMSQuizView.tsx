@@ -13,7 +13,7 @@ import {
   HelpCircle,
   Award,
 } from 'lucide-react'
-import { getCheckpointById, LMSQuizCheckpoint, LMSQuizQuestion } from '../../data/lmsMathTests'
+import { getCheckpointById, type LMSQuizCheckpoint, type LMSQuizQuestion } from '../../data/lmsMathTests'
 import MathContent from '../MathContent/MathContent'
 import styles from './LMSQuizView.module.css'
 
